@@ -1,0 +1,138 @@
+// Keevo Prompt Studio — modelo de dados
+//
+// A plataforma não executa o agente: ela só guarda, analisa, altera,
+// valida e versiona o TEXTO do prompt. Cada Prompt tem várias
+// PromptVersion (texto completo + metadados de temperatura/Top P). Toda
+// alteração passa por um ChangeRequest: pedido → análise → aprovação →
+// aplicação → validação → nova versão.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite local. Para Postgres: provider = "postgresql" e DATABASE_URL de um servidor real.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite não suporta enums no Prisma: os campos de status são String e os
+// valores válidos ficam documentados aqui.
+// ChangeRequest.kind:   PEDIDO (linguagem natural) | DIAGNOSTICO (a partir de uma conversa real, via IA opcional)
+//                       | MANUAL (edição direta no editor) | PARAMETROS (temperatura/Top P)
+//                       | RESTAURACAO | IMPORTACAO
+// ChangeRequest.status: AGUARDANDO_ESCLARECIMENTO | AGUARDANDO_APROVACAO | SEM_ALTERACAO
+//                       | APLICADA (novo prompt gerado, aguardando salvar) | VERSIONADA | CANCELADA
+// ChangeRequest.impactLevel: BAIXO | MEDIO | ALTO
+
+model Prompt {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  // Unidade de negócio do agente: HCM (eKeep) | ERP (Alpha) | EC (Holos). Ver src/lib/brand.ts
+  businessUnit String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Versão vigente (a última salva ou a restaurada).
+  currentVersionId String?
+
+  versions PromptVersion[]
+  changes  ChangeRequest[]
+}
+
+model PromptVersion {
+  id                String   @id @default(cuid())
+  promptId          String
+  prompt            Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  version           Int
+  // Texto original, exatamente como foi importado/salvo. Nunca é convertido.
+  content           String
+  // Metadados do agente de produção — a plataforma não executa nenhum modelo.
+  temperature       Float    @default(0.2)
+  topP              Float    @default(0.9)
+  changeDescription String?
+  createdBy         String   @default("não identificado")
+  createdAt         DateTime @default(now())
+
+  parentVersionId String?
+  parentVersion   PromptVersion?  @relation("VersionHistory", fields: [parentVersionId], references: [id])
+  childVersions   PromptVersion[] @relation("VersionHistory")
+
+  changesFrom ChangeRequest[] @relation("FromVersion")
+  changesTo   ChangeRequest[] @relation("ToVersion")
+
+  @@unique([promptId, version])
+}
+
+// Base de conhecimento da empresa: produtos de cada unidade de negócio,
+// informações institucionais, termos etc. Serve como fonte de referência
+// para a análise e a validação das alterações de prompt (não é enviada a
+// nenhum modelo). Substituir o arquivo cria uma nova revisão; nada se perde.
+// KnowledgeDocument.category: PRODUTOS | EMPRESA | TERMOS | COMERCIAL | PROCESSOS | OUTROS
+model KnowledgeDocument {
+  id           String   @id @default(cuid())
+  title        String
+  businessUnit String   // ex: "HCM", "ERP", "Institucional"
+  category     String
+  description  String?
+  // Revisão vigente (texto extraído + arquivo original ficam na revisão)
+  currentRevision Int   @default(1)
+  createdBy    String   @default("não identificado")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  revisions KnowledgeRevision[]
+}
+
+model KnowledgeRevision {
+  id         String            @id @default(cuid())
+  documentId String
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  revision   Int
+  fileName   String
+  mimeType   String
+  size       Int
+  // Texto extraído do arquivo (usado na busca e na análise)
+  content    String
+  // Arquivo original, para download
+  original   Bytes
+  note       String?
+  createdBy  String   @default("não identificado")
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, revision])
+}
+
+model ChangeRequest {
+  id       String @id @default(cuid())
+  promptId String
+  prompt   Prompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  kind     String @default("PEDIDO")
+  request  String
+  status   String
+
+  // Análise completa serializada (ver src/lib/engine/types.ts: ChangeAnalysis).
+  analysis         String
+  // Campos de consulta rápida, extraídos da análise (JSON de string[]).
+  affectedSections String @default("[]")
+  conflicts        String @default("[]")
+  suggestion       String?
+  impactLevel      String?
+
+  // Preenchidos quando a alteração é aplicada (antes de virar versão).
+  proposedContent String?
+  validation      String?
+  proposedTemperature Float?
+  proposedTopP        Float?
+
+  fromVersionId String?
+  fromVersion   PromptVersion? @relation("FromVersion", fields: [fromVersionId], references: [id])
+  toVersionId   String?
+  toVersion     PromptVersion? @relation("ToVersion", fields: [toVersionId], references: [id])
+
+  createdBy String    @default("não identificado")
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+}

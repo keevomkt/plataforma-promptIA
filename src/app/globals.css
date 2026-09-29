@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: #f7f6fa;
+  color: #181b20;
+}
+
+::selection {
+  background-color: #e6d2fa;
+}
+
+/* CodeMirror: ajusta o editor ao restante da tipografia do app */
+.cm-editor {
+  font-size: 13.5px;
+  height: 100%;
+}
+.cm-editor.cm-focused {
+  outline: none !important;
+}
+.cm-gutters {
+  background-color: #faf9fc !important;
+  border-right: 1px solid #e4e1ea !important;
+  color: #9a9c9f !important;
+}
+.cm-activeLineGutter,
+.cm-activeLine {
+  background-color: #f6effd !important;
+}
+.cm-scroller {
+  font-family: var(--font-plex-mono), ui-monospace, monospace !important;
+  line-height: 1.55;
+}
+.cm-searchMatch {
+  background-color: #fbf1df !important;
+}
+.cm-searchMatch-selected {
+  background-color: #ecd6a6 !important;
+}
+
+/* Faixa em degradê com as cores da logo Keevo (detalhe de marca) */
+.keevo-gradient {
+  background: linear-gradient(90deg, #ff9a1f 0%, #ee2a8b 40%, #8a12d6 75%, #16d2f5 100%);
+}
