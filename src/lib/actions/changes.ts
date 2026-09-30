@@ -15,6 +15,7 @@ type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 function statusFor(analysis: ChangeAnalysis) {
   if (analysis.audit) return "REVISAO_CONCLUIDA";
+  if (analysis.answer) return "RESPONDIDA";
   if (analysis.clarification) return "AGUARDANDO_ESCLARECIMENTO";
   return analysis.operations.length ? "AGUARDANDO_APROVACAO" : "SEM_ALTERACAO";
 }
@@ -25,7 +26,7 @@ function analysisColumns(analysis: ChangeAnalysis) {
     affectedSections: JSON.stringify(analysis.affectedSections),
     conflicts: JSON.stringify(analysis.conflicts.map((c) => c.description)),
     suggestion: analysis.suggestedRule ?? analysis.suggestion,
-    impactLevel: analysis.audit ? null : analysis.impact,
+    impactLevel: analysis.audit || analysis.answer ? null : analysis.impact,
     status: statusFor(analysis),
   };
 }
@@ -211,13 +212,13 @@ export async function cancelChange(changeId: string): Promise<ActionResult<null>
  * aqui — são a explicação por trás de uma versão real do prompt; a versão
  * em si segue disponível no Histórico e nunca é apagada.
  */
-const DELETABLE_STATUSES = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA"];
+const DELETABLE_STATUSES = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
 
 export async function deleteChange(changeId: string): Promise<ActionResult<null>> {
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change) return { ok: false, error: "Alteração não encontrada." };
   if (!DELETABLE_STATUSES.includes(change.status)) {
-    return { ok: false, error: "Só é possível excluir pedidos cancelados, sem alteração a propor ou revisões. Cancele o pedido primeiro." };
+    return { ok: false, error: "Só é possível excluir pedidos cancelados, sem alteração a propor, revisões ou perguntas já respondidas. Cancele o pedido primeiro." };
   }
   await prisma.changeRequest.delete({ where: { id: changeId } });
   refresh(await slugOf(change.promptId));

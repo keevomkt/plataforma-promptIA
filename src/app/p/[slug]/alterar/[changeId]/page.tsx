@@ -19,6 +19,7 @@ import { ValidationPanel } from "@/components/change/ValidationPanel";
 import { SaveVersionPanel } from "@/components/change/SaveVersionPanel";
 import { StaleBanner } from "@/components/change/StaleBanner";
 import { AuditReport } from "@/components/change/AuditReport";
+import { AnswerReport } from "@/components/change/AnswerReport";
 
 export default async function ChangeDetailPage({ params }: { params: { slug: string; changeId: string } }) {
   const prompt = await getPromptBySlug(params.slug);
@@ -43,7 +44,17 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
         <CardBody className="space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <Eyebrow>{isManual ? "Edição manual" : isDiagnosis ? "Diagnóstico de conversa" : analysis?.audit ? "Revisão do prompt" : "Solicitação recebida"}</Eyebrow>
+              <Eyebrow>
+                {isManual
+                  ? "Edição manual"
+                  : isDiagnosis
+                    ? "Diagnóstico de conversa"
+                    : analysis?.audit
+                      ? "Revisão do prompt"
+                      : analysis?.answer
+                        ? "Pergunta sobre o prompt"
+                        : "Solicitação recebida"}
+              </Eyebrow>
               <p className="mt-1 text-[17px] font-medium leading-snug text-ink">
                 {isManual ? "Edição direta do texto no editor" : <>&ldquo;{change.request}&rdquo;</>}
               </p>
@@ -126,7 +137,20 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
         </>
       )}
 
-      {analysis && !analysis.audit && (
+      {analysis?.answer && (
+        <>
+          <Card>
+            <CardBody className="space-y-1.5">
+              <Eyebrow>Entendimento da solicitação</Eyebrow>
+              <p className="text-[15px] leading-relaxed text-ink">{analysis.understanding}</p>
+              <p className="text-sm text-ink-soft">{analysis.suggestion}</p>
+            </CardBody>
+          </Card>
+          <AnswerReport answer={analysis.answer} knowledgeRefs={analysis.knowledgeRefs} />
+        </>
+      )}
+
+      {analysis && !analysis.audit && !analysis.answer && (
         <AnalysisReport analysis={analysis} showSuggestion={change.status !== "VERSIONADA"} />
       )}
 

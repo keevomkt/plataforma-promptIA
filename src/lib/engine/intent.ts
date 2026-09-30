@@ -33,7 +33,8 @@ export type ParsedRequest = {
 const EXPLICIT_REMOVE = /\b(remov\w*|retir\w*|exclu\w*|elimin\w*|apag\w*|delet\w*|tir(e|ar|a)|corta\w*|cortar)\b/;
 const SOFT_REMOVE =
   /\b(nao quero mais|nao (deve|precisa) mais|par(e|ar|ou) de|deix(e|ar) de|nao (pergunt\w*|pec\w*|solicit\w*|mencion\w*|fal\w*|inform\w*|diga)|sem (pergunt\w*|mencion\w*)|nao e mais necessari\w*)\b/;
-const ADD = /\b(adicion\w*|inclu\w*|acrescent\w*|insir\w*|inser\w*|nova regra|criar (uma )?regra|crie (uma )?regra|pass(e|ar) a|comec(e|ar) a)\b/;
+const ADD =
+  /\b(adicion\w*|inclu\w*|acrescent\w*|insir\w*|inser\w*|implement\w*|nova regra|criar (uma )?regra|crie (uma )?regra|pass(e|ar) a|comec(e|ar) a)\b/;
 // Pedido de revisão/auditoria do prompt inteiro (não é uma alteração)
 const AUDIT_VERB =
   /\b(analis\w*|revis\w*|audit\w*|verifi\w*|avali\w*|encontr\w*|procur\w*|identifi\w*|checa\w*|cheque|confer\w*|tem alguma|ha alguma|existe alguma|existem|tem regras?)\b/;
@@ -51,11 +52,23 @@ const SCOPE_ALL = /\b(todo o prompt|em todo (o )?prompt|de todo (o )?prompt|toda
 const SCOPE =
   /\b(?:somente|apenas|so)?\s*(?:d[oa]s?|n[oa]s?|em)\s+((?:fluxo|secao|etapa|parte|bloco|topico|regra de|regras de|passo)\b[^,.;]*)/;
 
+// Pergunta sobre o conteúdo do prompt (não é pedido de alteração nenhuma)
+const QUESTION_ENDING = /\?\s*["')\]]*\s*$/;
+const QUESTION_LOOKUP =
+  /\b(existe|existem|existi[ao]s?|possui\w*|conta com|contem|inclui\w*)\b.*\b(no prompt|na base|no agente|nele|nela)\b|\b(existe|existem|existi[ao]s?)\b/;
+const QUESTION_WH = /^(qual|quais|quanto|quantos?|quantas?|onde|quando|como|quem)\b/;
+const QUESTION_NOISE = [
+  /\bexiste?m?\b/g, /\bexisti[ao]s?\b/g, /\bpossui\w*\b/g, /\bcontem\b/g, /\binclui\w*\b/g, /\balgum\w*\b/g,
+  /\bconta com\b/g, /\b(qual|quais|quanto|quantos?|quantas?|onde|quando|como|quem)\b/g,
+  /\bno prompt\b/g, /\bna base( de conhecimento)?\b/g, /\bno agente\b/g, /\bnele\b/g, /\bnela\b/g,
+];
+
 /** Frases de intenção removidas antes de extrair o assunto. */
 const INTENT_NOISE = [
   /\bnao quero mais\b/g, /\bquero que (o bot|ele|o agente)?\b/g, /\bquero\b/g, /\bgostaria( de| que)?\b/g,
   /\bnao (deve|precisa) mais\b/g, /\bpar(e|ar|ou) de\b/g, /\bdeix(e|ar) de\b/g,
-  /\b(remov|retir|exclu|elimin|apag|delet|adicion|inclu|acrescent|insir|inser|troc|troqu|substitu|alter|mud|ajust|modific|melhor)\w*\b/g,
+  /\b(remov|retir|exclu|elimin|apag|delet|adicion|inclu|acrescent|insir|inser|implement|troc|troqu|substitu|alter|mud|ajust|modific|melhor)\w*\b/g,
+  /\bno prompt\b/g,
   /\b(tir(e|ar|a)|corta\w*)\b/g,
   /\b(a|uma|essa|esta|nova)? ?regra\b/g, /\bpergunta sobre\b/g,
   /\b(faca|faz|fazer|seja|ser|fique|ficar|comportamento|forma|maneira|jeito)\b/g,
@@ -71,13 +84,20 @@ function extractQuoted(text: string): string[] {
 
 /** "perguntar o cargo" → "Pergunte o cargo" (infinitivo → imperativo). */
 export function toImperative(phrase: string): string {
-  const t = phrase.trim().replace(/^(o bot|ele|o agente)\s+/i, "");
+  const t = phrase.trim().replace(/^(o bot|ele|o agente|a ia|o agente de ia|ia)\s+/i, "");
   const m = /^(sempre\s+|nunca\s+)?(\S+)(.*)$/i.exec(t);
   if (!m) return capitalizeFirst(t);
   const [, adv = "", verb, rest] = m;
   let v = verb;
   const lower = verb.toLowerCase();
-  if (/ar$/.test(lower)) v = verb.slice(0, -2) + "e";
+  // Verbos com mudança ortográfica no imperativo, para manter o som do infinitivo:
+  // -car → -que (qualificar→qualifique, verificar→verifique, buscar→busque)
+  // -çar → -ce (começar→comece, almoçar→almoce)
+  // -gar → -gue (pagar→pague, chegar→chegue, entregar→entregue)
+  if (/çar$/.test(lower)) v = verb.slice(0, -3) + "ce";
+  else if (/car$/.test(lower)) v = verb.slice(0, -3) + "que";
+  else if (/gar$/.test(lower)) v = verb.slice(0, -3) + "gue";
+  else if (/ar$/.test(lower)) v = verb.slice(0, -2) + "e";
   else if (/er$/.test(lower) || /ir$/.test(lower)) v = verb.slice(0, -2) + "a";
   // formas do subjuntivo já corretas ("pergunte", "informe") ficam como estão
   return capitalizeFirst(`${adv}${v}${rest}`);
@@ -158,6 +178,8 @@ export function parseRequest(request: string, answers: string[] = []): ParsedReq
     intent = "remover";
   } else if (ADD.test(n)) {
     intent = "adicionar";
+  } else if (QUESTION_ENDING.test(n) || QUESTION_LOOKUP.test(n) || QUESTION_WH.test(n)) {
+    intent = "pergunta";
   } else {
     intent = "alterar";
   }
@@ -168,9 +190,11 @@ export function parseRequest(request: string, answers: string[] = []): ParsedReq
       const m =
         /(?:regra|instru[cç][aã]o)\s*(?:que diga|dizendo|para|que|:)\s*:?\s*(.+)$/i.exec(fullText) ??
         /(?:pass[ea]r? a|come[cç][ea]r? a)\s+(.+)$/i.exec(fullText) ??
-        /(?:adicion\w*|inclu\w*|acrescent\w*|insir\w*)\s+(?:que\s+)?(.+)$/i.exec(fullText);
+        // "implementar (no prompt)?, para (que)? <regra>" — ex: "implementar no prompt, para a IA qualificar..."
+        /implement\w*\b(?:\s+no prompt)?,?\s*para\s+(?:que\s+)?(.+)$/i.exec(fullText) ??
+        /(?:adicion\w*|inclu\w*|acrescent\w*|insir\w*|implement\w*)\s+(?:que\s+)?(.+)$/i.exec(fullText);
       if (m) {
-        const raw = m[1].replace(/^(o bot|ele|o agente)\s+(deve\s+)?/i, "").trim();
+        const raw = m[1].replace(/^(o bot|ele|o agente|a ia|ia)\s+(deve\s+)?/i, "").trim();
         newRuleText = ensurePeriod(/^(sempre|nunca|não|nao)\b/i.test(raw) ? capitalizeFirst(raw) : toImperative(raw));
       }
     }
@@ -196,6 +220,7 @@ export function parseRequest(request: string, answers: string[] = []): ParsedReq
   if (intent === "substituir" && replaceFrom) topicSource = normalize(replaceFrom);
   if (intent === "condicional" && trigger) topicSource = trigger;
   for (const re of INTENT_NOISE) topicSource = topicSource.replace(re, " ");
+  if (intent === "pergunta") for (const re of QUESTION_NOISE) topicSource = topicSource.replace(re, " ");
   if (intent === "adicionar" && newRuleText) topicSource = `${topicSource} ${normalize(newRuleText)}`;
 
   const topicWords = Array.from(new Set(contentWords(topicSource)));

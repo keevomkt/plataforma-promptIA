@@ -24,7 +24,7 @@ export function ClearDeadChangesButton({ promptId, count }: { promptId: string; 
   if (confirming) {
     return (
       <span className="flex items-center gap-1.5 text-xs">
-        <span className="text-ink-faint">Excluir {count} pedido(s) cancelado(s), sem alteração ou revisões?</span>
+        <span className="text-ink-faint">Excluir {count} pedido(s) cancelado(s), sem alteração, revisões ou perguntas respondidas?</span>
         <Button size="sm" variant="danger" onClick={run} disabled={isPending}>
           {isPending ? "Excluindo…" : "Confirmar"}
         </Button>

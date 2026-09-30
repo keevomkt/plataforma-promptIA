@@ -7,7 +7,7 @@ import { isAiConfigured } from "@/lib/ai/client";
 import { Eyebrow } from "@/components/ui/Surfaces";
 
 const OPEN = ["AGUARDANDO_ESCLARECIMENTO", "AGUARDANDO_APROVACAO", "APLICADA"];
-const DELETABLE = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA"];
+const DELETABLE = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
 
 export default async function ChangePage({ params, searchParams }: { params: { slug: string }; searchParams: { pedido?: string } }) {
   const prompt = await getPromptBySlug(params.slug);

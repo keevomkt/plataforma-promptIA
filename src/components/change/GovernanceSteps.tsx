@@ -11,6 +11,7 @@ export function GovernanceSteps({ status }: { status: string }) {
     APLICADA: 4,
     VERSIONADA: 5,
     REVISAO_CONCLUIDA: 1,
+    RESPONDIDA: 1,
     CANCELADA: -1,
   };
   const current = reached[status] ?? 0;

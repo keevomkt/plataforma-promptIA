@@ -9,7 +9,8 @@ export type Intent =
   | "tom"
   | "menos_perguntas"
   | "condicional"
-  | "auditoria";
+  | "auditoria"
+  | "pergunta";
 
 export type ImpactLevel = "BAIXO" | "MEDIO" | "ALTO";
 
@@ -82,8 +83,16 @@ export type ChangeAnalysis = {
   knowledgeDocuments?: number;
   /** Presente só em revisões completas do prompt (intenção "auditoria", ver audit.ts). */
   audit?: AuditResult;
+  /** Presente só em perguntas sobre o conteúdo do prompt (intenção "pergunta") — nunca propõe alteração. */
+  answer?: AnswerResult;
   /** Presente só em diagnósticos gerados a partir de uma conversa real (ver src/lib/ai/diagnose.ts). */
   conversationInput?: { transcript?: string; hadImage: boolean; expectedBehavior: string };
+};
+
+export type AnswerResult = {
+  question: string;
+  /** Regras do prompt relacionadas à pergunta, da mais para a menos relevante. */
+  promptRules: RuleRef[];
 };
 
 export type AuditCategory =
@@ -162,7 +171,8 @@ export type ChangeStatus =
   | "APLICADA"
   | "VERSIONADA"
   | "CANCELADA"
-  | "REVISAO_CONCLUIDA";
+  | "REVISAO_CONCLUIDA"
+  | "RESPONDIDA";
 
 export const STATUS_LABELS: Record<string, string> = {
   AGUARDANDO_ESCLARECIMENTO: "Aguardando esclarecimento",
@@ -171,6 +181,7 @@ export const STATUS_LABELS: Record<string, string> = {
   APLICADA: "Aplicada — aguardando salvar",
   VERSIONADA: "Versionada",
   REVISAO_CONCLUIDA: "Revisão concluída",
+  RESPONDIDA: "Respondida",
   CANCELADA: "Cancelada",
 };
 

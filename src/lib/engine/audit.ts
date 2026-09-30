@@ -50,7 +50,8 @@ const GENERIC_STEMS = [
   "dev", "pod", "quand", "apen", "tod", "faz", "fac", "diga", "diz", "sobr", "algum", "qual", "outr",
 ];
 
-function isGenericStem(s: string) {
+/** Palavra comum demais para, sozinha, identificar o assunto de uma busca (ver questionAnalysis em analyze.ts). */
+export function isGenericStem(s: string) {
   return GENERIC_STEMS.some((g) => s === g || (s.startsWith(g) && s.length - g.length <= 3));
 }
 

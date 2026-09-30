@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/Surfaces";
 import { requestChange } from "@/lib/actions/changes";
 
 const EXAMPLES = [
+  "Existe algum vídeo de divulgação do produto no prompt?",
   "Revise o prompt completo: há regras duplicadas, contraditórias, sobrepostas ou mal escritas?",
   "Quero que o bot faça menos perguntas antes de encaminhar para o consultor.",
   "Não quero mais perguntar quantidade de CNPJs.",

@@ -51,6 +51,7 @@ export function StatusPill({ status }: { status: string }) {
     SEM_ALTERACAO: "neutral",
     APLICADA: "warn",
     REVISAO_CONCLUIDA: "accent",
+    RESPONDIDA: "accent",
     VERSIONADA: "added",
     CANCELADA: "neutral",
   };

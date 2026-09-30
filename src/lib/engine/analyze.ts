@@ -23,7 +23,7 @@ import type { ChangeAnalysis, Clarification, ImpactLevel, Operation, RuleRef } f
 import { conceptOf, ensurePeriod, normalize, polarity, stems, truncate } from "./text";
 import { findUnsourcedNames, KnowledgeIndex, type KnowledgeSource } from "./knowledge";
 import { computeImpact, computeInsertion, preserved } from "./shared";
-import { auditPrompt } from "./audit";
+import { auditPrompt, isGenericStem } from "./audit";
 
 export const LOCAL_ENGINE = "motor-local-v1";
 
@@ -63,6 +63,7 @@ export function analyzeChange(
   const parsed = parsePrompt(content);
   const req = parseRequest(request, answers);
   if (req.intent === "auditoria") return auditAnalysis(parsed, request, answers, knowledge, knowledgeScope);
+  if (req.intent === "pergunta") return questionAnalysis(parsed, request, answers, knowledge, knowledgeScope, req);
   const index = new PromptIndex(parsed);
   const notes: string[] = [];
 
@@ -170,11 +171,103 @@ function auditAnalysis(
   };
 }
 
+/**
+ * Pergunta sobre o conteúdo do prompt (seção 17: a plataforma também serve
+ * para consultar o que já está escrito, não só para propor mudanças).
+ * Nunca gera operação nenhuma — só aponta os trechos do prompt e da base de
+ * conhecimento relacionados à pergunta.
+ */
+function questionAnalysis(
+  parsed: ParsedPrompt,
+  request: string,
+  answers: string[],
+  knowledge: KnowledgeSource[],
+  knowledgeScope: string,
+  req: ParsedRequest
+): ChangeAnalysis {
+  const topicLabel = displayTopic(req);
+  const kb = new KnowledgeIndex(knowledge);
+
+  if (!req.topicStems.length) {
+    return {
+      engine: LOCAL_ENGINE,
+      request,
+      answers,
+      intent: "pergunta",
+      understanding: "Você fez uma pergunta, mas não ficou claro sobre qual assunto do prompt.",
+      affectedSections: [],
+      affectedRules: [],
+      preservedRules: [],
+      preservedSections: [],
+      relatedRules: [],
+      conflicts: [],
+      suggestion: "Descreva com mais detalhes o que você quer saber.",
+      suggestionBullets: [],
+      impact: "BAIXO",
+      impactReason: "pergunta, sem alteração",
+      operations: [],
+      notes: [],
+      knowledgeRefs: [],
+      knowledgeDocuments: knowledge.length,
+      answer: { question: request, promptRules: [] },
+    };
+  }
+
+  const index = new PromptIndex(parsed);
+  const found = index.find(req.topicStems);
+  // Sem nenhum termo raro/distintivo do assunto presente no prompt, os resultados costumam
+  // ser só palavras genéricas em comum (ex: "produto") — melhor responder "não encontrei"
+  // do que listar trechos pouco relacionados à pergunta.
+  const specificAnchors = found.anchors.filter((a) => !isGenericStem(a));
+  const confident = specificAnchors.length > 0 || req.topicStems.length <= 1;
+  const promptRules = confident
+    ? uniqueBy(
+        [...found.primary, ...found.related.filter((u) => u.score >= 0.45)].sort((a, b) => b.score - a.score),
+        (u) => u.line
+      )
+        .slice(0, 10)
+        .map((u) => ref(parsed, u))
+    : [];
+
+  const knowledgeRefs = kb.isEmpty ? [] : kb.search(req.topicStems, 6);
+  const inPrompt = promptRules.length > 0;
+  const inKnowledge = knowledgeRefs.length > 0;
+
+  const suggestion = !inPrompt && !inKnowledge
+    ? `Não encontrei nada sobre “${topicLabel}” no texto do prompt${knowledge.length ? ` nem na base de conhecimento (${knowledgeScope})` : ""}.`
+    : inPrompt
+      ? `Encontrei ${promptRules.length} trecho(s) do prompt relacionados a essa pergunta${inKnowledge ? `, e mais ${knowledgeRefs.length} na base de conhecimento` : ""}.`
+      : `Não encontrei isso no texto do prompt, mas a base de conhecimento tem ${knowledgeRefs.length} trecho(s) relacionados.`;
+
+  return {
+    engine: LOCAL_ENGINE,
+    request,
+    answers,
+    intent: "pergunta",
+    understanding: `Você perguntou sobre “${topicLabel}”.`,
+    affectedSections: [],
+    affectedRules: [],
+    preservedRules: [],
+    preservedSections: [],
+    relatedRules: [],
+    conflicts: [],
+    suggestion,
+    suggestionBullets: [],
+    impact: "BAIXO",
+    impactReason: "pergunta, sem alteração",
+    operations: [],
+    notes: [],
+    knowledgeRefs,
+    knowledgeDocuments: knowledge.length,
+    answer: { question: request, promptRules },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Handlers por intenção
 // ---------------------------------------------------------------------------
 
-const HANDLERS: Record<Exclude<ChangeAnalysis["intent"], "auditoria">, (ctx: Ctx) => Draft> = {
+const HANDLERS: Record<Exclude<ChangeAnalysis["intent"], "auditoria" | "pergunta">, (ctx: Ctx) => Draft> = {
   remover: handleRemove,
   adicionar: handleAdd,
   substituir: handleReplace,
