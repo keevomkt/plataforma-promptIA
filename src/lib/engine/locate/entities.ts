@@ -20,6 +20,8 @@ import { DEFINITION_AFTER_NAME, LEXICON_VERSION, NAME_CONNECTORS, PRESENTING_VER
 import type { FactResult, NamedItem } from "./types";
 
 const MAX_LIST_ITEM_WORDS = 5;
+/** Linha curta demais ("NG Folha" sozinho na subseção Nome) não serve de contexto. */
+const MIN_CONTEXT_WORDS = 6;
 
 type Candidate = {
   name: string;
@@ -246,7 +248,13 @@ function contextFor(parsed: ParsedPrompt, c: Candidate, lines: number[]): NamedI
   const rule = (ln: number) => ({ line: ln, text: parsed.lines[ln].text });
   if (c.section) {
     const inside = parsed.lines.filter((l) => l.index > c.section!.headingLine && l.index < c.section!.endLine && isRuleLine(l));
-    const best = inside.find((l) => lines.includes(l.index)) ?? inside[0];
+    const sentence = (l: { text: string }) => l.text.split(/\s+/).length >= MIN_CONTEXT_WORDS;
+    // Frase que define/apresenta o item; senão a primeira frase de verdade que o cita; senão a primeira frase da seção
+    const best =
+      inside.find((l) => inPresentingContext(l.text, c.name)) ??
+      inside.find((l) => lines.includes(l.index) && sentence(l)) ??
+      inside.find(sentence) ??
+      inside[0];
     return best ? rule(best.index) : undefined;
   }
   if (c.listItem) return { ...rule(c.listItem.line), intro: rule(c.listItem.head) };

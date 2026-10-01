@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { getCurrentVersion, getPromptBySlug } from "@/lib/data";
 import { isRuleLine, parsePrompt } from "@/lib/engine/parse";
-import { locateBehavior } from "@/lib/engine/locate";
+import { classifyQuestion, extractNamedItems, locateBehavior } from "@/lib/engine/locate";
 import { AskPromptResult } from "@/components/ask/AskPromptResult";
+import { FactResultView } from "@/components/ask/FactResultView";
 import { Card, CardBody, Eyebrow } from "@/components/ui/Surfaces";
 
 /**
@@ -20,7 +21,9 @@ export default async function AskPage({ params, searchParams }: { params: { slug
   }
 
   const parsed = parsePrompt(current.content);
-  const result = q ? locateBehavior(parsed, q) : null;
+  const kind = q ? classifyQuestion(q) : null;
+  const facts = kind && kind.kind !== "COMPORTAMENTO" ? extractNamedItems(parsed, q) : null;
+  const result = kind && kind.kind !== "FATO" ? locateBehavior(parsed, q) : null;
 
   // Sugestões tiradas do próprio prompt: as seções com mais regras
   const suggestions = parsed.sections
@@ -70,7 +73,21 @@ export default async function AskPage({ params, searchParams }: { params: { slug
         </CardBody>
       </Card>
 
-      {result && <AskPromptResult result={result} slug={prompt.slug} version={current.version} />}
+      {kind?.kind === "AMBIGUO" && (
+        <p className="rounded border border-warn-border bg-warn-bg/60 px-4 py-3 text-[13px] text-warn">
+          Não ficou claro se você quer uma lista de itens ou o que o prompt diz sobre o assunto ({kind.reason}). Por isso mostro os dois
+          resultados: primeiro a lista, depois as regras.
+        </p>
+      )}
+
+      {facts && <FactResultView result={facts} listed={kind?.listed} version={current.version} />}
+
+      {result && (
+        <>
+          {facts && <Eyebrow className="pt-2">O que o prompt diz sobre o assunto</Eyebrow>}
+          <AskPromptResult result={result} slug={prompt.slug} version={current.version} />
+        </>
+      )}
     </div>
   );
 }
