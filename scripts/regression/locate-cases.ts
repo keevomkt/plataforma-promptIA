@@ -159,5 +159,7 @@ export const ENTITY_CASES: EntityCase[] = [
     question: "Quais são os produtos ou soluções que existem nesse prompt",
     withSectionExactly: ["Alpha Core", "Alpha Emissor"],
     citedIncludes: ["NG Essence", "Holos", "NG Folha", "Keevo People", "eKeep", "Captura Notas"],
+    // Acrescentado depois da 1ª execução: siglas por extenso apareciam como alta confiança
+    lowConfidenceIfPresent: ["Departamento Pessoal", "Recursos Humanos"],
   },
 ];

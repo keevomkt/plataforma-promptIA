@@ -6,7 +6,7 @@
  * prompt carregado. Nenhum termo de negócio pode entrar aqui.
  * Mudou alguma lista? Suba a versão: ela é registrada em cada resultado.
  */
-export const LEXICON_VERSION = "pt-BR/1";
+export const LEXICON_VERSION = "pt-BR/2";
 
 /** Palavras da própria pergunta ou que falam sobre o prompt — nunca são o assunto. */
 export const QUESTION_META = [
@@ -48,3 +48,41 @@ export const NUMBER_WORDS: Record<string, number> = {
 
 /** Advérbios de frequência. */
 export const FREQUENCY_WORDS = ["sempre", "nunca", "jamais", "raramente", "eventualmente"];
+
+// --- Tipo de pergunta (lista de itens × comportamento) ---
+
+/** Interrogativos de listagem/contagem. "que" só conta quando seguido de verbo de existência. */
+export const LIST_INTERROGATIVES = ["quais", "quantos", "quantas", "que"];
+
+/** Verbos de pedido de lista. */
+export const LIST_VERBS = ["liste", "listar", "lista", "listagem", "enumere", "enumerar", "relacione", "relacionar"];
+
+/** Verbos de existência/presença que fecham o pedido de lista ("quais X existem"). */
+export const EXISTENCE_VERBS = [
+  "existem", "existe", "ha", "tem", "temos", "possui", "possuem", "constam", "consta", "aparecem", "aparece",
+  "estao", "esta", "sao", "citados", "citadas", "citado", "citada", "mencionados", "mencionadas", "presentes", "disponiveis",
+];
+
+/** Substantivos que falam do próprio prompt: "quais regras..." pede regras, não uma lista de itens. */
+export const META_NOUNS = [
+  "regra", "regras", "instrucao", "instrucoes", "orientacao", "orientacoes", "trecho", "trechos", "parte", "partes",
+  "secao", "secoes", "linha", "linhas", "comportamento", "comportamentos", "frase", "frases",
+];
+
+/** Modais e conectivos que transformam a pergunta em pergunta de comportamento. */
+export const BEHAVIOR_MARKERS = ["pode", "podem", "deve", "devem", "precisa", "precisam", "consegue", "permitido", "permitida", "quando", "se", "caso", "antes", "depois", "apos"];
+
+/** Determinantes e ligações ignorados ao ler o que a pergunta pede ("os produtos ou as soluções"). */
+export const LIST_FILLERS = ["sao", "os", "as", "o", "a", "de", "do", "da", "dos", "das", "e", "ou", "todos", "todas", "os/as"];
+
+/** Referência ao próprio prompt ("nesse prompt", "no texto"): não é assunto. */
+export const PROMPT_REFERENCES = ["prompt", "texto", "nesse", "neste", "no", "na", "nele", "nela", "aqui", "agente", "ia", "assistente", "bot"];
+
+/** Conectivos sem peso de assunto que podem aparecer em nomes próprios ("Departamento de Pessoal"). */
+export const NAME_CONNECTORS = ["de", "da", "do", "das", "dos", "e"];
+
+/** Contexto de definição logo após o nome ("X é...", "X faz parte..."). */
+export const DEFINITION_AFTER_NAME = ["é", "são", "faz parte", "fazem parte", "atende", "atendem"];
+
+/** Verbos de apresentação logo antes do nome ("apresente o X", "ofereça a X"). */
+export const PRESENTING_VERBS = ["apresente", "apresentar", "ofereça", "oferecer", "indique", "indicar", "recomende", "recomendar"];

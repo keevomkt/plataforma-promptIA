@@ -148,6 +148,7 @@ async function main() {
     if (verbose || fails.length) {
       for (const [label, list] of [["seção própria", r.withSection], ["citados", r.cited]] as const) {
         console.log(`  ${label}: ${list.map((i) => `${i.name}${i.confidence === "baixa" ? " (baixa)" : ""}`).join(", ") || "—"}`);
+        if (verbose) for (const i of list) console.log(`      · ${i.name}: ${i.signals.join("; ")}`);
       }
     }
     if (fails.length) entFailed++;
