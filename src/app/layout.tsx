@@ -37,14 +37,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="pt-BR" className={`${plexSans.variable} ${plexMono.variable}`}>
       <body className="font-sans antialiased">
         <div className="flex min-h-screen">
-          <aside className="flex w-60 shrink-0 flex-col border-r border-line bg-surface">
+          <aside className="sidebar-surface flex w-60 shrink-0 flex-col border-r border-accent/10">
             <div className="keevo-gradient h-1" />
-            <Link href="/" className="block border-b border-line px-4 py-4">
+            <Link href="/" className="block border-b border-accent/10 px-4 py-4">
               <KeevoMark />
             </Link>
 
             <nav className="flex-1 overflow-y-auto px-2 py-3">
-              <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Prompts</div>
+              <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Prompts</div>
               <ul className="space-y-0.5">
                 {prompts.map((p) => (
                   <li key={p.id}>
@@ -64,12 +64,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </ul>
               <Link
                 href="/?novo=1"
-                className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-accent-soft"
+                className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-white/80"
               >
                 + Novo prompt
               </Link>
 
-              <div className="mt-5 px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Referência</div>
+              <div className="mt-5 px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Referência</div>
               <SidebarLink
                 href="/conhecimento"
                 label={`Base de conhecimento${knowledgeCount ? ` (${knowledgeCount})` : ""}`}
@@ -83,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               />
             </nav>
 
-            <div className="border-t border-line px-4 py-3">
+            <div className="border-t border-accent/10 px-4 py-3">
               <ResponsibleInput initial={user === ANONYMOUS ? "" : user} />
             </div>
           </aside>

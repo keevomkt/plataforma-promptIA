@@ -28,7 +28,7 @@ export type BusinessUnit = {
 export const KEEVO_LOGO = "/brand/keevo.png";
 
 export const BUSINESS_UNITS: Record<BusinessUnitId, BusinessUnit> = {
-  HCM: { id: "HCM", brand: "eKeep", logo: "/brand/ekeep.png", aspect: 978 / 360, tile: "none" },
+  HCM: { id: "HCM", brand: "eKeep", logo: "/brand/ekeep-logo.png", aspect: 978 / 360, tile: "none" },
   ERP: { id: "ERP", brand: "Alpha", logo: "/brand/alpha.png", aspect: 1, tile: "bleed" },
   EC: { id: "EC", brand: "Holos", logo: "/brand/holos.png", aspect: 527 / 173, tile: "light", markRatio: 150 / 173 },
 };

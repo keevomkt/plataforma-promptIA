@@ -47,3 +47,10 @@ body {
 .keevo-gradient {
   background: linear-gradient(90deg, #ff9a1f 0%, #ee2a8b 40%, #8a12d6 75%, #16d2f5 100%);
 }
+
+/* Menu lateral: lavanda suave, mais intenso no alto (perto da marca), clareando até o branco */
+.sidebar-surface {
+  background:
+    radial-gradient(120% 45% at 0% 0%, rgba(138, 18, 214, 0.12) 0%, rgba(138, 18, 214, 0) 70%),
+    linear-gradient(180deg, #f5edfe 0%, #faf6ff 40%, #ffffff 100%);
+}
