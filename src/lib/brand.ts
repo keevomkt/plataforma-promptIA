@@ -13,10 +13,11 @@ export type BusinessUnit = {
   /** Proporção largura/altura da imagem original. */
   aspect: number;
   /**
-   * Fundo do quadro onde a logo aparece. A logo do eKeep tem o "e" branco
-   * e precisa de fundo escuro; a da Alpha já vem com fundo próprio.
+   * Fundo do quadro onde a logo aparece: "none" (logo com fundo transparente,
+   * sem quadro), "light", "dark" (logo clara) ou "bleed" (a logo já vem com
+   * fundo próprio, como a da Alpha).
    */
-  tile: "light" | "dark" | "bleed";
+  tile: "none" | "light" | "dark" | "bleed";
   /**
    * Em tamanhos pequenos, mostra só o símbolo à esquerda da logo (largura
    * do recorte = altura × markRatio). Usado quando o nome ficaria ilegível.
@@ -27,7 +28,7 @@ export type BusinessUnit = {
 export const KEEVO_LOGO = "/brand/keevo.png";
 
 export const BUSINESS_UNITS: Record<BusinessUnitId, BusinessUnit> = {
-  HCM: { id: "HCM", brand: "eKeep", logo: "/brand/ekeep.png", aspect: 2388 / 847, tile: "dark" },
+  HCM: { id: "HCM", brand: "eKeep", logo: "/brand/ekeep.png", aspect: 978 / 360, tile: "none" },
   ERP: { id: "ERP", brand: "Alpha", logo: "/brand/alpha.png", aspect: 1, tile: "bleed" },
   EC: { id: "EC", brand: "Holos", logo: "/brand/holos.png", aspect: 527 / 173, tile: "light", markRatio: 150 / 173 },
 };

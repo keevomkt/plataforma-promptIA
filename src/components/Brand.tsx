@@ -61,7 +61,9 @@ export function UnitLogo({
     );
   }
 
-  const pad = Math.max(3, Math.round(height * 0.18));
+  // Logo transparente não tem quadro: ocupa a altura toda, sem margem
+  const bare = info.tile === "none";
+  const pad = bare ? 0 : Math.max(3, Math.round(height * 0.18));
   const inner = height - pad * 2;
   const logoWidth = Math.round(inner * info.aspect);
   // Pequeno demais para ler o nome: recorta só o símbolo
@@ -70,11 +72,13 @@ export function UnitLogo({
     <span
       title={`${info.brand} · ${info.id}`}
       className={clsx(
-        "inline-flex shrink-0 items-center justify-center rounded-[5px]",
-        info.tile === "dark" ? "bg-[#0E1630]" : "border border-line bg-white",
+        "inline-flex shrink-0 items-center justify-center",
+        !bare && "rounded-[5px]",
+        info.tile === "dark" && "bg-[#0E1630]",
+        info.tile === "light" && "border border-line bg-white",
         className
       )}
-      style={{ height, paddingInline: cropWidth ? pad : pad + 2 }}
+      style={{ height, paddingInline: bare ? 0 : cropWidth ? pad : pad + 2 }}
     >
       <span className="block overflow-hidden" style={{ width: cropWidth ?? logoWidth, height: inner }}>
         <Image
