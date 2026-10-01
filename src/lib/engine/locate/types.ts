@@ -52,6 +52,40 @@ export type SectionHit = {
   groups: BehaviorGroup[];
 };
 
+/** Tipo de pergunta: lista de itens (FATO), o que o prompt diz (COMPORTAMENTO), ou na dúvida os dois. */
+export type QuestionKind = "FATO" | "COMPORTAMENTO" | "AMBIGUO";
+
+export type QuestionClassification = {
+  kind: QuestionKind;
+  /** O que a pergunta pede para listar, como foi escrito ("produtos ou soluções"). */
+  listed?: string;
+  /** Explicação curta da classificação, para a tela. */
+  reason: string;
+};
+
+/** Um item nomeado no prompt (produto, solução, plano...), sem lista fixa no código. */
+export type NamedItem = {
+  name: string;
+  /** "secao": tem seção própria no prompt. "citado": só aparece em listas ou menções. */
+  tier: "secao" | "citado";
+  confidence: "alta" | "baixa";
+  /** Sinais estruturais que levaram ao item, em texto para a tela. */
+  signals: string[];
+  /** Linhas onde o nome aparece (0-based). */
+  lines: number[];
+  /** Título da seção própria, quando houver. */
+  headingLine?: number;
+  /** Trecho literal do prompt que dá contexto ao item. */
+  context?: { line: number; text: string; intro?: { line: number; text: string } };
+};
+
+export type FactResult = {
+  question: string;
+  withSection: NamedItem[];
+  cited: NamedItem[];
+  lexiconVersion: string;
+};
+
 export type LocateResult = {
   question: string;
   topic: {

@@ -106,3 +106,58 @@ export const LOCATE_CASES: LocateCase[] = [
     mainGroupIncludes: [89, 90, 91],
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Tipo de pergunta: FATO (listagem/contagem de itens) × COMPORTAMENTO.
+// Além destes, toda pergunta de LOCATE_CASES precisa continuar COMPORTAMENTO.
+// ---------------------------------------------------------------------------
+export type ClassifyCase = { question: string; expect: "FATO" | "COMPORTAMENTO" | "AMBIGUO"; note?: string };
+
+export const CLASSIFY_CASES: ClassifyCase[] = [
+  { question: "Quais regras falam da preferência de contato?", expect: "COMPORTAMENTO", note: "armadilha: “quais” + regra (metalinguagem)" },
+  { question: "A IA pode dizer quais documentos existem na base de conhecimento?", expect: "COMPORTAMENTO", note: "armadilha: modal antes de “quais”" },
+  { question: "Quais são os produtos ou soluções que existem nesse prompt", expect: "FATO" },
+  { question: "Liste as soluções citadas no prompt", expect: "FATO" },
+  { question: "Que produtos existem no prompt?", expect: "FATO" },
+  { question: "Quantos planos existem no NG Essence?", expect: "AMBIGUO", note: "lista, mas restrita a um assunto: mostra os dois" },
+  { question: "Quando a IA deve perguntar o nome do usuário?", expect: "COMPORTAMENTO" },
+];
+
+// ---------------------------------------------------------------------------
+// Extração de itens nomeados para perguntas de FATO. Nomes exatamente como no prompt.
+// HCM e EC usados no desenvolvimento; ERP é a prova sem ajuste de código.
+// ---------------------------------------------------------------------------
+export type EntityCase = {
+  id: string;
+  prompt: string;
+  question: string;
+  /** Itens com seção própria: exatamente estes. */
+  withSectionExactly: string[];
+  /** Itens citados (sem seção própria): pelo menos estes. */
+  citedIncludes?: string[];
+  /** Se aparecerem, precisam estar marcados como baixa confiança. */
+  lowConfidenceIfPresent?: string[];
+};
+
+export const ENTITY_CASES: EntityCase[] = [
+  {
+    id: "F1-hcm-produtos",
+    prompt: "hcm",
+    question: "Quais são os produtos ou soluções que existem nesse prompt",
+    withSectionExactly: ["NG Folha", "eKeep", "NG Ponto", "Keevo People"],
+    lowConfidenceIfPresent: ["Regras de Segmentação", "Departamento Pessoal"],
+  },
+  {
+    id: "F2-ec-produtos",
+    prompt: "ec",
+    question: "Quais são os produtos ou soluções que existem nesse prompt",
+    withSectionExactly: ["NG Essence", "Captura Notas", "Holos"],
+  },
+  {
+    id: "F3-erp-produtos",
+    prompt: "erp",
+    question: "Quais são os produtos ou soluções que existem nesse prompt",
+    withSectionExactly: ["Alpha Core", "Alpha Emissor"],
+    citedIncludes: ["NG Essence", "Holos", "NG Folha", "Keevo People", "eKeep", "Captura Notas"],
+  },
+];

@@ -4,9 +4,9 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { parsePrompt } from "../../src/lib/engine/parse";
-import { locateBehavior } from "../../src/lib/engine/locate";
-import type { BehaviorGroup, LocateResult } from "../../src/lib/engine/locate/types";
-import { LOCATE_CASES, type LocateCase } from "./locate-cases";
+import { classifyQuestion, extractNamedItems, locateBehavior } from "../../src/lib/engine/locate";
+import type { BehaviorGroup, FactResult, LocateResult } from "../../src/lib/engine/locate/types";
+import { CLASSIFY_CASES, ENTITY_CASES, LOCATE_CASES, type EntityCase, type LocateCase } from "./locate-cases";
 
 const verbose = process.argv.includes("--verbose");
 const prisma = new PrismaClient();
@@ -76,6 +76,30 @@ function describe(r: LocateResult) {
   return out.join("\n");
 }
 
+async function currentContent(slug: string): Promise<string> {
+  const prompt = await prisma.prompt.findUnique({ where: { slug } });
+  const version = prompt?.currentVersionId ? await prisma.promptVersion.findUnique({ where: { id: prompt.currentVersionId } }) : null;
+  return version?.content ?? "";
+}
+
+function checkEntities(c: EntityCase, r: FactResult): string[] {
+  const fails: string[] = [];
+  const names = (l: { name: string }[]) => l.map((i) => i.name);
+  const got = names(r.withSection).sort().join(" | ");
+  const exp = [...c.withSectionExactly].sort().join(" | ");
+  if (got !== exp) fails.push(`seção própria deveria ser [${exp}], veio [${got}]`);
+  if (c.citedIncludes) {
+    const all = names([...r.withSection, ...r.cited]);
+    const missing = c.citedIncludes.filter((n) => !names(r.cited).includes(n));
+    if (missing.length) fails.push(`faltaram nos citados: ${missing.join(", ")}${missing.some((m) => all.includes(m)) ? " (alguns vieram como seção própria)" : ""}`);
+  }
+  for (const n of c.lowConfidenceIfPresent ?? []) {
+    const item = [...r.withSection, ...r.cited].find((i) => i.name === n);
+    if (item && item.confidence !== "baixa") fails.push(`“${n}” deveria estar como baixa confiança`);
+  }
+  return fails;
+}
+
 async function main() {
   let failed = 0;
   let gaps = 0;
@@ -99,8 +123,39 @@ async function main() {
     if (gap) gaps++;
   }
   console.log(`\n${LOCATE_CASES.length - failed - gaps}/${LOCATE_CASES.length} casos passaram${gaps ? `, ${gaps} lacuna(s) conhecida(s)` : ""}${failed ? `, ${failed} falha(s)` : ""}.`);
+
+  // Tipo de pergunta
+  console.log("\n— Tipo de pergunta");
+  const classify = [...CLASSIFY_CASES, ...LOCATE_CASES.map((c) => ({ question: c.question, expect: "COMPORTAMENTO" as const, note: `caso ${c.id}` }))];
+  let classFailed = 0;
+  for (const c of classify) {
+    const got = classifyQuestion(c.question);
+    const ok = got.kind === c.expect;
+    if (!ok) classFailed++;
+    if (!ok || verbose) console.log(`${ok ? "✓" : "✗"} ${got.kind}${ok ? "" : ` (esperado ${c.expect})`} “${c.question}”${c.note ? ` — ${c.note}` : ""} [${got.reason}]`);
+  }
+  console.log(`${classify.length - classFailed}/${classify.length} classificações corretas.`);
+
+  // Itens nomeados
+  console.log("\n— Itens nomeados (perguntas de fato)");
+  let entFailed = 0;
+  for (const c of ENTITY_CASES) {
+    const version = await currentContent(c.prompt);
+    const r = extractNamedItems(parsePrompt(version), c.question);
+    const fails = checkEntities(c, r);
+    console.log(`${fails.length ? "✗" : "✓"} ${c.id} “${c.question}”`);
+    fails.forEach((f) => console.log(`    - ${f}`));
+    if (verbose || fails.length) {
+      for (const [label, list] of [["seção própria", r.withSection], ["citados", r.cited]] as const) {
+        console.log(`  ${label}: ${list.map((i) => `${i.name}${i.confidence === "baixa" ? " (baixa)" : ""}`).join(", ") || "—"}`);
+      }
+    }
+    if (fails.length) entFailed++;
+  }
+  console.log(`${ENTITY_CASES.length - entFailed}/${ENTITY_CASES.length} extrações corretas.`);
+
   await prisma.$disconnect();
-  process.exit(failed ? 1 : 0);
+  process.exit(failed || classFailed || entFailed ? 1 : 0);
 }
 
 main();
