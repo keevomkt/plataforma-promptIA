@@ -13,7 +13,9 @@ export type MatchReason =
   /** A regra faz parte de um item de lista ou introdução ("Exemplos:", "Caso ...:") já encontrado. */
   | { kind: "estrutura"; headLine: number }
   /** A regra retoma, por pronome ou expressão de referência, uma regra anterior do mesmo bloco. */
-  | { kind: "referencia"; marker: string; antecedentLine: number };
+  | { kind: "referencia"; marker: string; antecedentLine: number }
+  /** A regra está entre duas regras já encontradas do mesmo bloco. */
+  | { kind: "posicao"; before: number; after: number };
 
 export type LocatedRule = {
   line: number;

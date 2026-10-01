@@ -61,9 +61,13 @@ function describe(r: LocateResult) {
     out.push(`  ${i === 0 ? "PRINCIPAL" : "grupo"} ${g.title} (score ${g.score.toFixed(2)})`);
     for (const rule of g.rules) {
       const why = rule.reasons
-        .map((x) =>
-          x.kind === "termo" ? `termo(${x.terms.join("+")})` : x.kind === "secao" ? "seção" : x.kind === "estrutura" ? `estrutura(L${x.headLine + 1})` : `ref(“${x.marker}”→L${x.antecedentLine + 1})`
-        )
+        .map((x) => {
+          if (x.kind === "termo") return `termo(${x.terms.join("+")})`;
+          if (x.kind === "secao") return "seção";
+          if (x.kind === "estrutura") return `estrutura(L${x.headLine + 1})`;
+          if (x.kind === "posicao") return `posição(L${x.before + 1}–L${x.after + 1})`;
+          return `ref(“${x.marker}”→L${x.antecedentLine + 1})`;
+        })
         .join(", ");
       out.push(`      L${rule.line + 1} [${why}] ${rule.text.slice(0, 90)}`);
     }
@@ -74,6 +78,7 @@ function describe(r: LocateResult) {
 
 async function main() {
   let failed = 0;
+  let gaps = 0;
   for (const c of LOCATE_CASES) {
     const prompt = await prisma.prompt.findUnique({ where: { slug: c.prompt } });
     const version = prompt?.currentVersionId ? await prisma.promptVersion.findUnique({ where: { id: prompt.currentVersionId } }) : null;
@@ -84,12 +89,16 @@ async function main() {
     }
     const result = locateBehavior(parsePrompt(version.content), c.question);
     const fails = check(c, result);
-    console.log(`${fails.length ? "✗" : "✓"} ${c.id} [${c.kind}] “${c.question}”`);
+    const gap = fails.length > 0 && !!c.knownGap;
+    console.log(`${!fails.length ? "✓" : gap ? "◐" : "✗"} ${c.id} [${c.kind}] “${c.question}”`);
     fails.forEach((f) => console.log(`    - ${f}`));
+    if (gap) console.log(`    lacuna conhecida: ${c.knownGap}`);
+    if (!fails.length && c.knownGap) console.log(`    (a lacuna conhecida foi resolvida — remova “knownGap” do caso)`);
     if (verbose || fails.length) console.log(describe(result));
-    if (fails.length) failed++;
+    if (fails.length && !gap) failed++;
+    if (gap) gaps++;
   }
-  console.log(`\n${LOCATE_CASES.length - failed}/${LOCATE_CASES.length} casos passaram.`);
+  console.log(`\n${LOCATE_CASES.length - failed - gaps}/${LOCATE_CASES.length} casos passaram${gaps ? `, ${gaps} lacuna(s) conhecida(s)` : ""}${failed ? `, ${failed} falha(s)` : ""}.`);
   await prisma.$disconnect();
   process.exit(failed ? 1 : 0);
 }

@@ -23,6 +23,8 @@ export type LocateCase = {
   overlapInvolves?: number[];
   /** Nenhum achado de duplicidade/divergência no grupo principal (proteção contra alarme falso). */
   noOverlapInMainGroup?: boolean;
+  /** Lacuna conhecida e ainda não resolvida: é reportada, mas não conta como aprovada nem derruba a execução. */
+  knownGap?: string;
 };
 
 export const LOCATE_CASES: LocateCase[] = [
@@ -69,5 +71,38 @@ export const LOCATE_CASES: LocateCase[] = [
     question: "A IA pode dizer quais documentos existem na base de conhecimento?",
     mainGroupIncludes: [321, 322, 323, 324],
     overlapInvolves: [324],
+  },
+  {
+    // Encontrado na 1ª checagem às cegas: falhou antes de as regras herdarem o assunto do caminho da seção.
+    id: "B1-hcm-qualificacao-produto",
+    kind: "controle",
+    prompt: "hcm",
+    question: "O que a IA precisa descobrir sobre a folha de pagamento na qualificação do eKeep?",
+    mainGroupIncludes: [329, 330, 331, 332, 333, 334, 335, 336, 337],
+    knownGap:
+      "o bloco certo vem completo, mas em 2º lugar, quase empatado com a descrição do produto: a pergunta diz “descobrir” e o prompt diz “busque identificar”, e não há sinônimos",
+  },
+  // 2ª checagem às cegas (blocos sorteados, perguntas escritas antes de rodar)
+  {
+    id: "B2-hcm-folha-nao-clientes",
+    kind: "controle",
+    prompt: "hcm",
+    question: "O que a IA pergunta sobre a folha de pagamento para quem não é cliente?",
+    mainGroupIncludes: [117, 118, 119, 120],
+  },
+  {
+    id: "B3-ec-resistencia",
+    kind: "controle",
+    prompt: "ec",
+    question: "Como a IA reage quando o escritório resiste a responder as perguntas?",
+    mainGroupIncludes: [297, 299, 301, 303, 305],
+    knownGap: "“resiste” (verbo) não casa com “Resistência” (substantivo): o radical leve não junta palavras derivadas",
+  },
+  {
+    id: "B4-erp-apresentacao-generica",
+    kind: "controle",
+    prompt: "erp",
+    question: "Como a IA apresenta as soluções quando o usuário pergunta de forma genérica?",
+    mainGroupIncludes: [89, 90, 91],
   },
 ];
