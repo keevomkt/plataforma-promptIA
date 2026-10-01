@@ -9,6 +9,7 @@ export function PromptTabs({ slug, openChanges }: { slug: string; openChanges: n
   const base = `/p/${slug}`;
   const tabs = [
     { href: base, label: "Prompt", active: pathname === base },
+    { href: `${base}/perguntar`, label: "Perguntar ao prompt", active: pathname.startsWith(`${base}/perguntar`) },
     {
       href: `${base}/alterar`,
       label: "Alterar prompt",

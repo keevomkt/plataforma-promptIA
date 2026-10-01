@@ -169,7 +169,8 @@ function ancestors(parsed: ParsedPrompt, s: PromptSection): PromptSection[] {
 }
 
 function extractTopic(question: string, ctx: Ctx) {
-  const words = normalize(question).split(" ");
+  // Palavras como foram escritas (com acento), para exibição; o radical vem da forma normalizada
+  const words = question.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const kept: { word: string; stem: string }[] = [];
   for (const w of words) {
     const [s] = stems(w);
