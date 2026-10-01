@@ -11,9 +11,12 @@ generator client {
 }
 
 datasource db {
-  // SQLite local. Para Postgres: provider = "postgresql" e DATABASE_URL de um servidor real.
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  // Postgres (Supabase). DATABASE_URL: pooler de transações (porta 6543, com
+  // ?pgbouncer=true), usado pela aplicação. DIRECT_URL: pooler de sessão
+  // (porta 5432), usado pelo Prisma para criar/alterar tabelas.
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // SQLite não suporta enums no Prisma: os campos de status são String e os
