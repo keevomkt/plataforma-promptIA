@@ -27,6 +27,29 @@ datasource db {
 // ChangeRequest.status: AGUARDANDO_ESCLARECIMENTO | AGUARDANDO_APROVACAO | SEM_ALTERACAO
 //                       | APLICADA (novo prompt gerado, aguardando salvar) | VERSIONADA | CANCELADA
 // ChangeRequest.impactLevel: BAIXO | MEDIO | ALTO
+// User.role:   ADMIN | USUARIO
+// User.status: PENDENTE (cadastrou, aguarda aprovação) | ATIVO | BLOQUEADO
+
+// Contas de acesso. A senha nunca é guardada: só o hash (scrypt, com sal).
+// sessionVersion invalida todas as sessões abertas da pessoa quando muda
+// (bloqueio, senha redefinida, troca de senha).
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  role               String    @default("USUARIO")
+  status             String    @default("PENDENTE")
+  mustChangePassword Boolean   @default(false)
+  sessionVersion     Int       @default(0)
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  approvedBy         String?
+  approvedAt         DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
 
 model Prompt {
   id          String   @id @default(cuid())

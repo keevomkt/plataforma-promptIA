@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion, readAnalysis } from "@/lib/data";
-import { getCurrentUser } from "@/lib/user";
+import { requireUser } from "@/lib/auth/session";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { getAnalyzer } from "@/lib/engine";
 import { applyOperations } from "@/lib/engine/apply";
@@ -42,6 +42,7 @@ function refresh(slug: string) {
 
 /** PASSO 2–4: registra o pedido e roda a análise. Nada é alterado no prompt. */
 export async function requestChange(promptId: string, request: string): Promise<ActionResult<{ changeId: string }>> {
+  const me = await requireUser();
   const text = request.trim();
   if (!text) return { ok: false, error: "Descreva o que você deseja alterar." };
   const current = await getCurrentVersion(promptId);
@@ -55,7 +56,7 @@ export async function requestChange(promptId: string, request: string): Promise<
       kind: "PEDIDO",
       request: text,
       fromVersionId: current.id,
-      createdBy: getCurrentUser(),
+      createdBy: me.name,
       ...analysisColumns(analysis),
     },
   });
@@ -65,6 +66,7 @@ export async function requestChange(promptId: string, request: string): Promise<
 
 /** Resposta a uma pergunta de esclarecimento (escopo, detalhe) → refaz a análise. */
 export async function answerClarification(changeId: string, answer: string): Promise<ActionResult<null>> {
+  await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId }, include: { fromVersion: true } });
   if (!change?.fromVersion) return { ok: false, error: "Alteração não encontrada." };
   if (!["AGUARDANDO_ESCLARECIMENTO", "SEM_ALTERACAO"].includes(change.status)) {
@@ -94,6 +96,7 @@ export async function applyChange(
   changeId: string,
   edits: { id: string; enabled: boolean; newText: string }[]
 ): Promise<ActionResult<null>> {
+  await requireUser();
   const parsedEdits = EditSchema.safeParse(edits);
   if (!parsedEdits.success) return { ok: false, error: "Operações inválidas." };
 
@@ -145,6 +148,7 @@ export async function applyChange(
 
 /** Volta uma alteração aplicada (ainda não salva) para edição das operações. */
 export async function reopenChange(changeId: string): Promise<ActionResult<null>> {
+  await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change || change.status !== "APLICADA" || !["PEDIDO", "DIAGNOSTICO"].includes(change.kind)) {
     return { ok: false, error: "Só é possível editar alterações aplicadas e ainda não salvas." };
@@ -159,6 +163,7 @@ export async function reopenChange(changeId: string): Promise<ActionResult<null>
 
 /** PASSO 9: salva o novo prompt completo como uma nova versão. */
 export async function saveAsVersion(changeId: string, description: string): Promise<ActionResult<{ versionId: string }>> {
+  const user = (await requireUser()).name;
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId }, include: { fromVersion: true } });
   if (!change?.fromVersion || change.proposedContent === null) return { ok: false, error: "Alteração não encontrada." };
   if (change.status !== "APLICADA") return { ok: false, error: "Esta alteração não está pronta para ser salva." };
@@ -170,7 +175,6 @@ export async function saveAsVersion(changeId: string, description: string): Prom
     return { ok: false, error: `O prompt mudou desde a análise (versão atual v${current?.version}). Refaça a alteração sobre a versão atual.` };
   }
 
-  const user = getCurrentUser();
   const version = await prisma.$transaction(async (tx) => {
     const latest = await tx.promptVersion.findFirst({ where: { promptId: change.promptId }, orderBy: { version: "desc" } });
     const created = await tx.promptVersion.create({
@@ -198,6 +202,7 @@ export async function saveAsVersion(changeId: string, description: string): Prom
 }
 
 export async function cancelChange(changeId: string): Promise<ActionResult<null>> {
+  await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change) return { ok: false, error: "Alteração não encontrada." };
   if (change.status === "VERSIONADA") return { ok: false, error: "Alterações já versionadas não podem ser canceladas. Restaure uma versão anterior." };
@@ -215,6 +220,7 @@ export async function cancelChange(changeId: string): Promise<ActionResult<null>
 const DELETABLE_STATUSES = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
 
 export async function deleteChange(changeId: string): Promise<ActionResult<null>> {
+  await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change) return { ok: false, error: "Alteração não encontrada." };
   if (!DELETABLE_STATUSES.includes(change.status)) {
@@ -227,6 +233,7 @@ export async function deleteChange(changeId: string): Promise<ActionResult<null>
 
 /** Limpa de uma vez todos os pedidos cancelados/sem alteração de um prompt. */
 export async function clearDeadChanges(promptId: string): Promise<ActionResult<{ count: number }>> {
+  await requireUser();
   const { count } = await prisma.changeRequest.deleteMany({
     where: { promptId, status: { in: DELETABLE_STATUSES } },
   });
@@ -236,6 +243,7 @@ export async function clearDeadChanges(promptId: string): Promise<ActionResult<{
 
 /** Refaz a análise do mesmo pedido sobre a versão atual (quando o prompt mudou). */
 export async function reanalyzeChange(changeId: string): Promise<ActionResult<{ changeId: string }>> {
+  const me = await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change || change.kind !== "PEDIDO") return { ok: false, error: "Alteração não encontrada." };
   const current = await getCurrentVersion(change.promptId);
@@ -252,7 +260,7 @@ export async function reanalyzeChange(changeId: string): Promise<ActionResult<{ 
       kind: "PEDIDO",
       request: change.request,
       fromVersionId: current.id,
-      createdBy: getCurrentUser(),
+      createdBy: me.name,
       ...analysisColumns(analysis),
     },
   });

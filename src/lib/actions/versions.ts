@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion } from "@/lib/data";
-import { getCurrentUser } from "@/lib/user";
+import { requireUser } from "@/lib/auth/session";
 import { createPrompt } from "@/lib/actions/prompts";
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -13,12 +13,12 @@ type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
  * parâmetros da versão escolhida, e ela passa a ser a atual.
  */
 export async function restoreVersion(versionId: string): Promise<ActionResult<{ version: number }>> {
+  const user = (await requireUser()).name;
   const source = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
   if (!source) return { ok: false, error: "Versão não encontrada." };
   const current = await getCurrentVersion(source.promptId);
   if (current?.id === source.id) return { ok: false, error: "Esta já é a versão atual." };
 
-  const user = getCurrentUser();
   const description = `Restauração da v${source.version}`;
   const created = await prisma.$transaction(async (tx) => {
     const latest = await tx.promptVersion.findFirst({ where: { promptId: source.promptId }, orderBy: { version: "desc" } });
@@ -57,6 +57,7 @@ export async function restoreVersion(versionId: string): Promise<ActionResult<{ 
 
 /** Duplicar cria um prompt independente a partir da versão (para outro agente ou para experimentar). */
 export async function duplicateVersion(versionId: string, name: string): Promise<ActionResult<{ slug: string }>> {
+  await requireUser();
   const source = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
   if (!source) return { ok: false, error: "Versão não encontrada." };
   return createPrompt({

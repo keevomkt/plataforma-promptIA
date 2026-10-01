@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
-export function SidebarLink({ href, label, icon }: { href: string; label: string; icon?: React.ReactNode }) {
+export function SidebarLink({ href, label, icon, badge }: { href: string; label: string; icon?: React.ReactNode; badge?: number }) {
   const pathname = usePathname();
   const active = pathname === href || pathname.startsWith(`${href}/`);
   return (
@@ -20,6 +20,11 @@ export function SidebarLink({ href, label, icon }: { href: string; label: string
       {active && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-accent" />}
       {icon}
       <span className="truncate">{label}</span>
+      {!!badge && (
+        <span className="ml-auto rounded-full bg-accent px-1.5 text-[10px] font-semibold leading-4 text-white" title={`${badge} cadastro(s) aguardando aprovação`}>
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

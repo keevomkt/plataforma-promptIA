@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { apiUser, unauthorized } from "@/lib/auth/session";
 import { getCurrentVersion } from "@/lib/data";
-import { getCurrentUser } from "@/lib/user";
 import { isAiConfigured } from "@/lib/ai/client";
 import { diagnoseFromConversation } from "@/lib/ai/diagnose";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
@@ -17,6 +17,8 @@ const IMAGE_TYPES: Record<string, "image/png" | "image/jpeg" | "image/webp"> = {
 
 /** PASSO 2–4 (por diagnóstico): recebe uma conversa real + comportamento esperado e roda o diagnóstico por IA. */
 export async function POST(req: NextRequest, { params }: { params: { slug: string } }) {
+  const me = await apiUser();
+  if (!me) return unauthorized();
   if (!isAiConfigured()) {
     return NextResponse.json({ error: "Diagnóstico por IA não está configurado. Defina ANTHROPIC_API_KEY no arquivo .env do servidor." }, { status: 400 });
   }
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { slug: strin
       suggestion: analysis.suggestion,
       impactLevel: analysis.impact,
       fromVersionId: current.id,
-      createdBy: getCurrentUser(),
+      createdBy: me.name,
     },
   });
 

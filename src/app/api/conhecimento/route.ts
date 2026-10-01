@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/user";
+import { apiUser, unauthorized } from "@/lib/auth/session";
 import { extractText } from "@/lib/knowledge/extract";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 
 /** Upload de um ou mais arquivos para a base de conhecimento. */
 export async function POST(req: NextRequest) {
+  const me = await apiUser();
+  if (!me) return unauthorized();
   const form = await req.formData();
   const businessUnit = String(form.get("businessUnit") ?? "").trim();
   const category = String(form.get("category") ?? "");
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!KNOWLEDGE_CATEGORIES[category]) return NextResponse.json({ error: "Categoria inválida." }, { status: 400 });
   if (!files.length) return NextResponse.json({ error: "Selecione ao menos um arquivo." }, { status: 400 });
 
-  const user = getCurrentUser();
+  const user = me.name;
   const created: { id: string; title: string }[] = [];
   const errors: { fileName: string; error: string }[] = [];
 

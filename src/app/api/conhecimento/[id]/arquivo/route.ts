@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { apiUser, unauthorized } from "@/lib/auth/session";
 
 /** Download do arquivo original de uma revisão (?rev=N; padrão: a vigente). */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const me = await apiUser();
+  if (!me) return unauthorized();
   const doc = await prisma.knowledgeDocument.findUnique({ where: { id: params.id } });
   if (!doc) return NextResponse.json({ error: "Documento não encontrado." }, { status: 404 });
   const rev = Number(req.nextUrl.searchParams.get("rev") ?? doc.currentRevision);

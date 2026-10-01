@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/user";
+import { apiUser, unauthorized } from "@/lib/auth/session";
 import { extractText } from "@/lib/knowledge/extract";
 
 /** Substitui o arquivo de um documento: cria uma nova revisão e ela passa a valer. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const me = await apiUser();
+  if (!me) return unauthorized();
   const doc = await prisma.knowledgeDocument.findUnique({ where: { id: params.id } });
   if (!doc) return NextResponse.json({ error: "Documento não encontrado." }, { status: 404 });
 
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     const { text, mimeType } = await extractText(file.name, buf);
-    const user = getCurrentUser();
+    const user = me.name;
     const revision = await prisma.$transaction(async (tx) => {
       const last = await tx.knowledgeRevision.findFirst({ where: { documentId: doc.id }, orderBy: { revision: "desc" } });
       const next = (last?.revision ?? 0) + 1;

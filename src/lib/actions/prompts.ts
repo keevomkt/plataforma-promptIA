@@ -1,10 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion } from "@/lib/data";
-import { getCurrentUser, USER_COOKIE } from "@/lib/user";
+import { requireUser } from "@/lib/auth/session";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { validateChange } from "@/lib/engine/validate";
 import { parsePrompt, sectionLabel, splitLines } from "@/lib/engine/parse";
@@ -51,13 +50,13 @@ export async function createPrompt(input: {
   topP: number;
   sourceLabel?: string;
 }): Promise<ActionResult<{ slug: string }>> {
+  const user = (await requireUser()).name;
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Dê um nome ao prompt (ex: Agente Comercial)." };
   if (!input.content.trim()) return { ok: false, error: "Cole o texto do prompt ou importe um arquivo .txt/.md." };
   const paramError = checkParams(input.temperature, input.topP);
   if (paramError) return { ok: false, error: paramError };
 
-  const user = getCurrentUser();
   const slug = await uniqueSlug(name);
   await prisma.$transaction(async (tx) => {
     const prompt = await tx.prompt.create({
@@ -102,6 +101,7 @@ export async function submitManualEdit(input: {
   baseVersionId: string;
   content: string;
 }): Promise<ActionResult<{ changeId: string }>> {
+  const me = await requireUser();
   const current = await getCurrentVersion(input.promptId);
   if (!current) return { ok: false, error: "Prompt sem versão." };
   if (current.id !== input.baseVersionId) {
@@ -123,7 +123,7 @@ export async function submitManualEdit(input: {
       proposedContent: input.content,
       validation: JSON.stringify(validation),
       fromVersionId: current.id,
-      createdBy: getCurrentUser(),
+      createdBy: me.name,
     },
   });
   const prompt = await prisma.prompt.findUniqueOrThrow({ where: { id: input.promptId } });
@@ -166,6 +166,7 @@ export async function updateParams(input: {
   temperature: number;
   topP: number;
 }): Promise<ActionResult<{ version: number }>> {
+  const user = (await requireUser()).name;
   const paramError = checkParams(input.temperature, input.topP);
   if (paramError) return { ok: false, error: paramError };
   const current = await getCurrentVersion(input.promptId);
@@ -179,7 +180,6 @@ export async function updateParams(input: {
   if (current.temperature !== input.temperature) parts.push(`Temperatura ${current.temperature} → ${input.temperature}`);
   if (current.topP !== input.topP) parts.push(`Top P ${current.topP} → ${input.topP}`);
   const description = `Ajuste de parâmetros: ${parts.join(", ")}`;
-  const user = getCurrentUser();
 
   const created = await prisma.$transaction(async (tx) => {
     const latest = await tx.promptVersion.findFirst({ where: { promptId: input.promptId }, orderBy: { version: "desc" } });
@@ -219,18 +219,9 @@ export async function updateParams(input: {
   return { ok: true, data: { version: created.version } };
 }
 
-export async function setResponsible(name: string): Promise<void> {
-  const value = name.trim().slice(0, 60);
-  if (value) {
-    cookies().set(USER_COOKIE, encodeURIComponent(value), { maxAge: 60 * 60 * 24 * 365, path: "/", sameSite: "lax" });
-  } else {
-    cookies().delete(USER_COOKIE);
-  }
-  revalidatePath("/", "layout");
-}
-
 /** Define a unidade de negócio do prompt (HCM, ERP, EC), usada para exibir a logo correspondente. */
 export async function setPromptUnit(promptId: string, unit: string | null): Promise<ActionResult<null>> {
+  await requireUser();
   const resolved = unit ? resolveUnit(unit) : undefined;
   if (unit && !resolved) return { ok: false, error: "Unidade de negócio inválida." };
   await prisma.prompt.update({ where: { id: promptId }, data: { businessUnit: resolved?.id ?? null } });
