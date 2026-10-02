@@ -11,10 +11,16 @@ export function KnowledgeResultView({ answer, label }: { answer: KnowledgeAnswer
         <div>
           <Eyebrow>{label}</Eyebrow>
           <p className="text-[12.5px] text-ink-faint">
-            {answer.docs.length} de {answer.consulted} documento(s) consultados ({answer.scope}) citam &ldquo;{answer.topic}&rdquo;. Trechos copiados dos
-            documentos.
+            {answer.docs.length} de {answer.consulted} documento(s) consultados ({answer.scope}){" "}
+            {answer.items ? "citam algum destes itens" : <>citam &ldquo;{answer.topic}&rdquo;</>}. Trechos copiados dos documentos.
           </p>
         </div>
+        {!!answer.interpretation?.length && (
+          <div className="rounded border border-accent/20 bg-accent-soft/50 px-3 py-2 text-[12.5px] text-accent-strong">
+            <span className="font-semibold">Como entendi a pergunta: </span>
+            {answer.interpretation.join(" ")}
+          </div>
+        )}
         <ul className="divide-y divide-line">
           {answer.docs.map((d) => (
             <li key={d.documentId} className="py-3">
@@ -29,6 +35,11 @@ export function KnowledgeResultView({ answer, label }: { answer: KnowledgeAnswer
                 <Pill tone="accent">
                   {d.occurrences} {d.occurrences === 1 ? "ocorrência" : "ocorrências"}
                 </Pill>
+                {answer.items && (
+                  <span className="text-[12px] text-ink-soft">
+                    cita: <span className="font-medium text-ink">{d.matched.join(", ")}</span>
+                  </span>
+                )}
                 {Object.entries(d.forms).map(([form, n]) => (
                   <span key={form} className="rounded-sm bg-sunken px-1.5 py-px text-[11px] text-ink-faint">
                     escrito como <span className="font-mono text-ink-soft">{form}</span> ×{n}

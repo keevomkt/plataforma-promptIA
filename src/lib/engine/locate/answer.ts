@@ -28,10 +28,22 @@ import type { AskAnswer } from "./types";
 
 const META_STEMS = new Set(QUESTION_META.map(stem));
 
-export function answerQuestion(parsed: ParsedPrompt, question: string, kb: { sources: KnowledgeSource[]; scope: string }): AskAnswer {
+export function answerQuestion(
+  parsed: ParsedPrompt,
+  question: string,
+  kb: { sources: KnowledgeSource[]; scope: string },
+  ctx: {
+    /** Sigla/nome/endereço do próprio prompt ("EC"): na pergunta, indicam o escopo, não o assunto. */
+    unitTerms?: string[];
+  } = {}
+): AskAnswer {
   const classification = classifyQuestion(question);
   const { kind } = classification;
-  const topicQuestion = classification.topicQuestion ?? question;
+  const unit = new Set((ctx.unitTerms ?? []).map(normalize).filter(Boolean));
+  const unitWords = Array.from(question.matchAll(/[\p{L}\p{N}]+/gu))
+    .map((m) => m[0])
+    .filter((w) => unit.has(normalize(w)));
+  const topicQuestion = withoutWords(classification.topicQuestion ?? question, unit);
   const answer: AskAnswer = { question, classification, consulted: { prompt: false, base: false } };
 
   if (kind === "FATO" || kind === "AMBIGUO") {
@@ -50,11 +62,37 @@ export function answerQuestion(parsed: ParsedPrompt, question: string, kb: { sou
   if (kind !== "FATO" && !baseIsSubject) {
     const corpus = [parsed.lines.map((l) => l.raw).join("\n"), ...kb.sources.map((s) => s.content)];
     const topic = questionTopic(topicQuestion, corpus);
-    if (topic.phrases.length || topic.words.length) {
-      const index = new KnowledgeIndex(kb.sources);
-      answer.knowledge = { topic: [...topic.phrases, ...topic.words.map((w) => w.word)].join(", "), consulted: kb.sources.length, scope: kb.scope, docs: index.findForQuestion(topic) };
+    const index = new KnowledgeIndex(kb.sources);
+    const interpretation: string[] = [];
+    if (unitWords.length) interpretation.push(`“${unitWords[0]}” é a unidade deste prompt: a consulta já é limitada a ela.`);
+
+    // Pergunta de documentos sem nome, só com uma categoria ("os produtos", "as soluções"):
+    // quer dizer os itens que o prompt nomeia — desde que o próprio prompt/base chame os
+    // itens por esse tipo ("o X é uma solução", "o produto X").
+    const asksDocs = kind === "DOCUMENTOS" || !!classification.sourceSelected;
+    const category = asksDocs && !topic.phrases.length ? categoryOf(parsed, corpus, topic) : undefined;
+    if (category) {
+      interpretation.push(`“${category.words.join(" ou ")}” entendido como os itens que o prompt nomeia: ${category.items.join(", ")}.`);
+      answer.knowledge = {
+        topic: category.items.join(", "),
+        items: category.items,
+        interpretation,
+        consulted: kb.sources.length,
+        scope: kb.scope,
+        docs: index.findForQuestion({ phrases: category.items, words: [] }, { minScore: 0 }),
+      };
+      answer.consulted.base = true;
+    } else if (topic.phrases.length || topic.words.length) {
+      answer.knowledge = {
+        topic: [...topic.phrases, ...topic.words.map((w) => w.word)].join(", "),
+        interpretation: interpretation.length ? interpretation : undefined,
+        consulted: kb.sources.length,
+        scope: kb.scope,
+        docs: index.findForQuestion(topic),
+      };
       answer.consulted.base = true;
     }
+    if (category) answer.consulted.prompt = true; // os itens vieram do prompt
   }
 
   // Regras do prompt sobre a fonte citada: seção à parte, nunca como resposta
@@ -63,6 +101,46 @@ export function answerQuestion(parsed: ParsedPrompt, question: string, kb: { sou
     answer.consulted.prompt = true;
   }
   return answer;
+}
+
+function withoutWords(text: string, words: Set<string>): string {
+  if (!words.size) return text;
+  return text
+    .replace(/[\p{L}\p{N}]+/gu, (w) => (words.has(normalize(w)) ? "" : w))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Tipos com que as fontes chamam os itens nomeados do prompt, tirados das
+ * próprias frases: "o X é uma solução", "o produto X", "X: Solução para…".
+ * Devolve os itens se alguma palavra da pergunta for um desses tipos.
+ */
+function categoryOf(parsed: ParsedPrompt, corpus: string[], topic: QuestionTopic): { words: string[]; items: string[] } | undefined {
+  if (!topic.words.length) return undefined;
+  const named = extractNamedItems(parsed, "");
+  const items = (named.withSection.length ? named.withSection : named.cited.filter((i) => i.confidence === "alta")).map((i) => i.name);
+  if (!items.length) return undefined;
+  const types = new Set<string>();
+  for (const name of items) {
+    for (const text of corpus) {
+      for (const m of Array.from(text.matchAll(spellingPattern(name)))) {
+        const before = text.slice(Math.max(0, m.index! - 40), m.index!);
+        const after = text.slice(m.index! + m[0].length, m.index! + m[0].length + 40);
+        const nouns = [
+          before.match(/(?:^|[\s(])(?:o|a|os|as|do|da|dos|das|no|na|um|uma)\s+([\p{L}]+)\s*$/iu)?.[1], // "o produto X"
+          after.match(/^\s+(?:é|são)\s+(?:o|a|um|uma)\s+([\p{L}]+)/iu)?.[1], // "X é uma solução"
+          after.match(/^\**\s*:\**\s*([\p{L}]+)/u)?.[1], // "X: Solução para…"
+        ];
+        for (const n of nouns) {
+          const [s] = n ? stems(n) : [];
+          if (s) types.add(s);
+        }
+      }
+    }
+  }
+  const words = topic.words.filter((w) => types.has(w.stem)).map((w) => w.word);
+  return words.length ? { words, items } : undefined;
 }
 
 /** Artigos e contrações que, antes de um substantivo, marcam "o produto X", "da solução X". */

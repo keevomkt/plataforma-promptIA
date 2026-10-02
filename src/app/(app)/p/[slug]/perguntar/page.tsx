@@ -31,7 +31,9 @@ export default async function AskPage({ params, searchParams }: { params: { slug
   }
 
   const parsed = parsePrompt(current.content);
-  const ans = q ? answerQuestion(parsed, q, await loadKnowledgeForPrompt(prompt.id)) : null;
+  const ans = q ? answerQuestion(parsed, q, await loadKnowledgeForPrompt(prompt.id), {
+        unitTerms: [prompt.slug, prompt.name, prompt.businessUnit ?? ""].filter(Boolean),
+      }) : null;
   const kind = ans?.classification;
   const facts = ans?.facts;
   const result = ans?.behavior;
