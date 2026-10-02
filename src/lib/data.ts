@@ -31,11 +31,16 @@ export async function getVersion(promptId: string, versionId: string) {
   return version;
 }
 
+/**
+ * Lista de pedidos: só os campos que a lista mostra. Trazer as versões e a
+ * análise junto custava ~160 KB por prompt (texto do prompt 2× por pedido),
+ * e tudo era enviado ao navegador.
+ */
 export async function listChanges(promptId: string) {
   return prisma.changeRequest.findMany({
     where: { promptId },
     orderBy: { createdAt: "desc" },
-    include: { fromVersion: true, toVersion: true },
+    select: { id: true, kind: true, request: true, status: true, impactLevel: true, createdAt: true, createdBy: true },
   });
 }
 
