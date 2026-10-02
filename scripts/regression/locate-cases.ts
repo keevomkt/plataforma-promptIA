@@ -215,6 +215,25 @@ export const ANSWER_CASES: AnswerCase[] = [
     noKnowledgeSection: true,
   },
   {
+    // Relatado pelo usuário: nome em minúsculas e precedido de "produto" perdia 3 documentos
+    id: "K7-ec-minusculas-com-descritor",
+    prompt: "ec",
+    question: "quais bases de conhecimento mencionam o produto ng essence?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["NGEssence Run", "NGEssence Start", "Tabela NGessence (2)", "Exemplos de interação - Agente EC", "Keevo Institucional - EC"],
+    firstDoc: "NGEssence Run",
+    occurrences: { "NGEssence Run": 18, "NGEssence Start": 16, "Tabela NGessence (2)": 11, "Exemplos de interação - Agente EC": 3, "Keevo Institucional - EC": 1 },
+  },
+  {
+    // Mesma correção em outra unidade, sem ajuste
+    id: "K8-erp-minusculas-com-descritor",
+    prompt: "erp",
+    question: "quais documentos falam da solução alpha core?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["Alpha Core", "Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP", "Alpha Emissor"],
+    firstDoc: "Alpha Core",
+  },
+  {
     // A base é o ASSUNTO (comportamento da IA sobre a base), não a fonte a consultar
     id: "K6-erp-base-como-assunto",
     prompt: "erp",
