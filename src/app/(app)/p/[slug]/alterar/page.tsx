@@ -1,9 +1,7 @@
 import { getPromptBySlug, listChanges } from "@/lib/data";
 import { ChangeRequestForm } from "@/components/ChangeRequestForm";
-import { DiagnoseRequestForm, DiagnoseSetupNotice } from "@/components/DiagnoseRequestForm";
 import { ChangeListItem } from "@/components/ChangeListItem";
 import { ClearDeadChangesButton } from "@/components/ClearDeadChangesButton";
-import { isAiConfigured } from "@/lib/ai/client";
 import { Eyebrow } from "@/components/ui/Surfaces";
 
 const OPEN = ["AGUARDANDO_ESCLARECIMENTO", "AGUARDANDO_APROVACAO", "APLICADA"];
@@ -20,7 +18,6 @@ export default async function ChangePage({ params, searchParams }: { params: { s
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
       <ChangeRequestForm promptId={prompt.id} slug={prompt.slug} initial={searchParams.pedido ?? ""} />
 
-      {isAiConfigured() ? <DiagnoseRequestForm slug={prompt.slug} /> : <DiagnoseSetupNotice />}
 
       {open.length > 0 && (
         <div>

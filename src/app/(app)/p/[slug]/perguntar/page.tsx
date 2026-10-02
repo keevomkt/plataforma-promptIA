@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getCurrentVersion, getPromptBySlug } from "@/lib/data";
 import { isRuleLine, parsePrompt } from "@/lib/engine/parse";
 import { answerQuestion } from "@/lib/engine/locate";
@@ -7,16 +6,25 @@ import { AskPromptResult, GroupBlock } from "@/components/ask/AskPromptResult";
 import { FactResultView } from "@/components/ask/FactResultView";
 import { KnowledgeResultView } from "@/components/ask/KnowledgeResultView";
 import { Card, CardBody, Eyebrow, Pill } from "@/components/ui/Surfaces";
+import { AskForm } from "@/components/ask/AskForm";
+import { QuestionHistory } from "@/components/ask/QuestionHistory";
+import { prisma } from "@/lib/prisma";
+import { formatDateTime } from "@/lib/data";
 
 /**
- * Consulta ao que o prompt já diz. Não grava nada: a pergunta vai no
- * endereço (?q=), então o resultado pode ser recarregado e compartilhado.
+ * Consulta ao que o prompt e a base já dizem. Nada no prompt é alterado: a
+ * pergunta vai no endereço (?q=) e fica registrada só no histórico da aba.
  */
 export default async function AskPage({ params, searchParams }: { params: { slug: string }; searchParams: { q?: string } }) {
   const prompt = await getPromptBySlug(params.slug);
   const current = await getCurrentVersion(prompt.id);
   const q = (searchParams.q ?? "").trim().slice(0, 500);
-  const base = `/p/${prompt.slug}/perguntar`;
+  const history = await prisma.question.findMany({
+    where: { promptId: prompt.id },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+    select: { id: true, text: true, kind: true, createdAt: true, createdBy: true },
+  });
 
   if (!current) {
     return <p className="mx-auto max-w-3xl px-6 py-6 text-sm text-ink-soft">Este prompt ainda não tem nenhuma versão.</p>;
@@ -53,33 +61,7 @@ export default async function AskPage({ params, searchParams }: { params: { slug
               (v{current.version}) ou nos documentos da base.
             </p>
           </div>
-          <form method="get" action={base} className="space-y-2">
-            <textarea
-              name="q"
-              defaultValue={q}
-              rows={2}
-              required
-              maxLength={500}
-              placeholder="Escreva sua dúvida sobre o comportamento da IA"
-              className="w-full resize-y rounded border border-line bg-surface px-3 py-2 text-[14px] text-ink outline-none focus:border-accent"
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-1.5">
-                {suggestions.map((s) => (
-                  <Link
-                    key={s}
-                    href={`${base}?q=${encodeURIComponent(s)}`}
-                    className="rounded-sm border border-line bg-sunken px-2 py-1 text-[12px] text-ink-soft hover:border-accent hover:text-ink"
-                  >
-                    {s}
-                  </Link>
-                ))}
-              </div>
-              <button type="submit" className="rounded bg-accent px-4 py-1.5 text-[13px] font-medium text-white hover:bg-accent-strong">
-                Perguntar
-              </button>
-            </div>
-          </form>
+          <AskForm key={q} promptId={prompt.id} initial={q} suggestions={suggestions} />
         </CardBody>
       </Card>
 
@@ -154,6 +136,12 @@ export default async function AskPage({ params, searchParams }: { params: { slug
           </div>
         </details>
       )}
+
+      <QuestionHistory
+        slug={prompt.slug}
+        current={q}
+        items={history.map((h) => ({ id: h.id, text: h.text, kind: h.kind, when: formatDateTime(h.createdAt), createdBy: h.createdBy }))}
+      />
     </div>
   );
 }

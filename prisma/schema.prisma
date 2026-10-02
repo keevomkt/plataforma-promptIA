@@ -64,8 +64,24 @@ model Prompt {
   // Versão vigente (a última salva ou a restaurada).
   currentVersionId String?
 
-  versions PromptVersion[]
-  changes  ChangeRequest[]
+  versions  PromptVersion[]
+  changes   ChangeRequest[]
+  questions Question[]
+}
+
+// Histórico da aba "Perguntar ao prompt". Guarda só a pergunta: a resposta é
+// recalculada ao abrir, com o prompt e a base de conhecimento atuais.
+// Question.kind: FATO | COMPORTAMENTO | AMBIGUO | DOCUMENTOS
+model Question {
+  id        String   @id @default(cuid())
+  promptId  String
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  text      String
+  kind      String?
+  createdBy String   @default("não identificado")
+  createdAt DateTime @default(now())
+
+  @@index([promptId, createdAt])
 }
 
 model PromptVersion {
