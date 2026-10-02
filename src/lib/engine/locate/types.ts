@@ -93,6 +93,10 @@ export type KnowledgeDocHit = {
 
 export type KnowledgeAnswer = {
   topic: string;
+  /** A pergunta citou uma categoria ("produtos"): a base foi consultada por estes itens nomeados no prompt. */
+  items?: string[];
+  /** Como a pergunta foi entendida, em texto para a tela (categoria, unidade do prompt...). */
+  interpretation?: string[];
   /** Quantos documentos foram consultados (unidade + gerais). */
   consulted: number;
   scope: string;

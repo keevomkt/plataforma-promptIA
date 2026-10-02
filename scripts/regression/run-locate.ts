@@ -120,6 +120,12 @@ function checkAnswer(c: AnswerCase, r: AskAnswer): string[] {
   const forms = new Set(docs.flatMap((d) => Object.keys(d.forms)));
   for (const f of c.formsInclude ?? []) if (!forms.has(f)) fails.push(`grafia “${f}” não foi mostrada`);
   if (c.noKnowledgeSection && docs.length) fails.push(`a base não deveria aparecer, mas trouxe: ${titles.join(", ")}`);
+  if (c.categoryItems) {
+    const exp = [...c.categoryItems].sort().join(" | ");
+    const got = [...(r.knowledge?.items ?? [])].sort().join(" | ");
+    if (exp !== got) fails.push(`categoria deveria virar os itens [${exp}], virou [${got || "—"}]`);
+  }
+  if (c.noCategory && r.knowledge?.items?.length) fails.push(`busca literal virou categoria: ${r.knowledge.items.join(", ")}`);
   const main = r.behavior?.groups[0];
   const mainLines = main ? main.rules.map((x) => x.line + 1) : [];
   const missing = (c.promptMainIncludes ?? []).filter((l) => !mainLines.includes(l));
@@ -196,7 +202,9 @@ async function main() {
   for (const c of ANSWER_CASES) {
     const prompt = await prisma.prompt.findUnique({ where: { slug: c.prompt } });
     const kb = await loadKnowledgeForPrompt(prompt!.id);
-    const r = answerQuestion(parsePrompt(await currentContent(c.prompt)), c.question, kb);
+    const r = answerQuestion(parsePrompt(await currentContent(c.prompt)), c.question, kb, {
+      unitTerms: [prompt!.slug, prompt!.name, prompt!.businessUnit ?? ""].filter(Boolean),
+    });
     const fails = checkAnswer(c, r);
     console.log(`${fails.length ? "✗" : "✓"} ${c.id} “${c.question}”`);
     fails.forEach((f) => console.log(`    - ${f}`));

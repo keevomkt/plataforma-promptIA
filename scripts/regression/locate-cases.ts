@@ -166,6 +166,10 @@ export type AnswerCase = {
   promptMainSection?: string;
   /** Linhas que não podem aparecer como resposta do prompt (só, no máximo, na seção à parte sobre a fonte). */
   notInPromptAnswer?: number[];
+  /** A pergunta cita uma categoria: a base deve ser consultada por exatamente estes itens do prompt. */
+  categoryItems?: string[];
+  /** Busca literal: não pode virar consulta por categoria. */
+  noCategory?: boolean;
 };
 
 export const ANSWER_CASES: AnswerCase[] = [
@@ -256,6 +260,33 @@ export const ANSWER_CASES: AnswerCase[] = [
     expectKind: "DOCUMENTOS",
     docsExactly: ["NGEssence Run", "NGEssence Start", "Tabela NGessence (2)", "Exemplos de interação - Agente EC", "Keevo Institucional - EC"],
     occurrences: { "NGEssence Start": 16, "Exemplos de interação - Agente EC": 3 },
+  },
+  // Categoria em vez de nome (relatado pelo usuário): "produtos ou soluções" = itens que o prompt nomeia;
+  // a sigla da unidade do prompt é escopo, não assunto. Registrado antes do código.
+  {
+    id: "K12-ec-categoria-produtos",
+    prompt: "ec",
+    question: "quais bases de conhecimento mencionam os produtos ou soluções voltadas ao ec?",
+    expectKind: "DOCUMENTOS",
+    categoryItems: ["NG Essence", "Captura Notas", "Holos"],
+    docsExactly: ["Captura Notas", "Exemplos de interação - Agente EC", "Holos", "Keevo Institucional - EC", "NGEssence Run", "NGEssence Start", "Tabela NGessence (2)"],
+  },
+  {
+    id: "K13-erp-categoria-solucoes",
+    prompt: "erp",
+    question: "quais documentos falam das soluções do erp?",
+    expectKind: "DOCUMENTOS",
+    categoryItems: ["Alpha Core", "Alpha Emissor"],
+    docsExactly: ["Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP", "Alpha Emissor", "Alpha Core"],
+  },
+  {
+    // Controle: palavra comum que existe nos documentos continua busca literal
+    id: "K14-ec-literal-nao-vira-categoria",
+    prompt: "ec",
+    question: "quais bases mencionam preço?",
+    expectKind: "DOCUMENTOS",
+    docsIncludes: ["NGEssence Run"],
+    noCategory: true,
   },
   {
     // A base é o ASSUNTO (comportamento da IA sobre a base), não a fonte a consultar
