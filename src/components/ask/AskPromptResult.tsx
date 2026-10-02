@@ -4,7 +4,7 @@ import type { BehaviorGroup, LocatedRule, LocateResult, MatchReason, OverlapFind
 
 const L = (line: number) => `L${line + 1}`;
 
-export function AskPromptResult({ result, slug, version }: { result: LocateResult; slug: string; version: number }) {
+export function AskPromptResult({ result, slug, version, showSource = true }: { result: LocateResult; slug: string; version: number; showSource?: boolean }) {
   const allGroups = [...result.sectionHits.flatMap((h) => h.groups), ...result.groups];
   const ruleText = new Map(allGroups.flatMap((g) => g.rules.map((r) => [r.line, r.text] as const)));
   const overlaps = dedupeOverlaps(allGroups.flatMap((g) => g.overlaps));
@@ -14,11 +14,15 @@ export function AskPromptResult({ result, slug, version }: { result: LocateResul
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-faint">
-        <span>Fonte consultada:</span>
-        <Pill tone="accent">Prompt v{version}</Pill>
+        {showSource && (
+          <>
+            <span>Fonte consultada:</span>
+            <Pill tone="accent">Prompt v{version}</Pill>
+          </>
+        )}
         {result.topic.display && (
           <span>
-            · assunto entendido: <span className="text-ink-soft">&ldquo;{result.topic.display}&rdquo;</span>
+            {showSource && "· "}assunto entendido: <span className="text-ink-soft">&ldquo;{result.topic.display}&rdquo;</span>
           </span>
         )}
       </div>
@@ -106,7 +110,7 @@ export function AskPromptResult({ result, slug, version }: { result: LocateResul
   );
 }
 
-function GroupBlock({ group, slug, nested }: { group: BehaviorGroup; slug: string; nested?: boolean }) {
+export function GroupBlock({ group, slug, nested }: { group: BehaviorGroup; slug: string; nested?: boolean }) {
   const range = group.firstLine === group.lastLine ? L(group.firstLine) : `${L(group.firstLine)}–${L(group.lastLine)}`;
   const path = group.sectionPath.join(" › ");
   const pedido = `Nas regras ${range} (${group.title}): `;

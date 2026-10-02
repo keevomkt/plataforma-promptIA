@@ -3,7 +3,7 @@ import type { FactResult, NamedItem } from "@/lib/engine/locate";
 
 const L = (line: number) => `L${line + 1}`;
 
-export function FactResultView({ result, listed, version }: { result: FactResult; listed?: string; version: number }) {
+export function FactResultView({ result, listed, version, showSource = true }: { result: FactResult; listed?: string; version: number; showSource?: boolean }) {
   const high = result.cited.filter((i) => i.confidence === "alta");
   const low = result.cited.filter((i) => i.confidence === "baixa");
   const total = result.withSection.length + result.cited.length;
@@ -11,11 +11,15 @@ export function FactResultView({ result, listed, version }: { result: FactResult
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-faint">
-        <span>Fonte consultada:</span>
-        <Pill tone="accent">Prompt v{version}</Pill>
+        {showSource && (
+          <>
+            <span>Fonte consultada:</span>
+            <Pill tone="accent">Prompt v{version}</Pill>
+          </>
+        )}
         {listed && (
           <span>
-            · lista pedida: <span className="text-ink-soft">&ldquo;{listed}&rdquo;</span>
+            {showSource && "· "}lista pedida: <span className="text-ink-soft">&ldquo;{listed}&rdquo;</span>
           </span>
         )}
       </div>
