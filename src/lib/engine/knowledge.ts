@@ -20,9 +20,11 @@ const ACCENTS: Record<string, string> = { a: "[aáàâãä]", e: "[eéèêë]", 
  * Padrão que reconhece um nome com qualquer variação de espaço, hífen,
  * maiúscula ou acento: "NG Essence", "NGEssence", "ng-essence", "NGessence".
  */
-export function spellingPattern(phrase: string): RegExp {
+export function spellingPattern(phrase: string, opts: { splitInside?: boolean } = {}): RegExp {
   const parts = stripAccents(phrase.toLowerCase()).split(/[\s\-_]+/).filter(Boolean);
-  const part = (p: string) => Array.from(p).map((ch) => ACCENTS[ch] ?? ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("");
+  const char = (ch: string) => ACCENTS[ch] ?? ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // splitInside: palavra digitada colada ("ngessence") também casa com a forma separada ("NG Essence")
+  const part = (p: string) => Array.from(p).map(char).join(opts.splitInside ? "[\\s\\-_]?" : "");
   return new RegExp(`(?<![\\p{L}\\p{N}])${parts.map(part).join("[\\s\\-_]*")}(?![\\p{L}\\p{N}])`, "giu");
 }
 
@@ -157,7 +159,8 @@ export class KnowledgeIndex {
     const minScore = opts.minScore ?? 0.5;
     const maxExcerpts = opts.maxExcerpts ?? 3;
     const matchers = [
-      ...topic.phrases.map((p) => ({ label: p, phrase: true, re: spellingPattern(p) })),
+      // Nome de uma palavra só (≥6 letras) também casa com a forma separada ("ngessence" × "NG Essence")
+      ...topic.phrases.map((p) => ({ label: p, phrase: true, re: spellingPattern(p, { splitInside: !/[\s\-_]/.test(p.trim()) && p.trim().length >= 6 }) })),
       ...topic.words.map((w) => ({ label: w.word, phrase: false, stem: w.stem })),
     ];
     if (!matchers.length || !this.sources.length) return [];

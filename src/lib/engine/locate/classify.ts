@@ -55,7 +55,8 @@ function sourceSpans(t: Token[]): Span[] {
     if (!SOURCE_NOUNS.includes(t[i].norm)) continue;
     const qualified = t[i + 1]?.norm === SOURCE_QUALIFIER[0] && t[i + 2]?.norm === SOURCE_QUALIFIER[1];
     const isBase = t[i].norm.startsWith("base");
-    if (isBase && !qualified && !SOURCE_ARTICLES.includes(t[i - 1]?.norm ?? "")) continue; // "com base em" não é a fonte
+    const afterListWord = LIST_INTERROGATIVES.includes(t[i - 1]?.norm ?? "") || LIST_VERBS.includes(t[i - 1]?.norm ?? ""); // "quais bases", "liste as bases"
+    if (isBase && !qualified && !afterListWord && !SOURCE_ARTICLES.includes(t[i - 1]?.norm ?? "")) continue; // "com base em" não é a fonte
     let from = i;
     if (SOURCE_ARTICLES.includes(t[i - 1]?.norm ?? "")) from = i - 1;
     spans.push({ from, to: qualified ? i + 2 : i });
@@ -104,6 +105,11 @@ export function classifyQuestion(question: string): QuestionClassification {
   const locative = spans.some(
     (s) => SOURCE_LOCATIVES.includes(words[s.from]) || SOURCE_LOCATIVES.includes(words[s.from - 1] ?? "") || SAYING_VERBS.includes(words[s.to + 1] ?? "")
   );
+
+  // "documentos que citam X", "bases que mencionam X": pedido de documentos mesmo sem palavra de pergunta
+  if (restContent.length && spans.some((s) => words[s.to + 1] === "que" && SAYING_VERBS.includes(words[s.to + 2] ?? ""))) {
+    return { kind: "DOCUMENTOS", reason: "pede quais documentos da base tratam do assunto", ...source(true) };
+  }
 
   // Onde começa o pedido de lista
   let start = -1;

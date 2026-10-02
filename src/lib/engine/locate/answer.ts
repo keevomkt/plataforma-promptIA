@@ -10,7 +10,7 @@
  */
 import type { ParsedPrompt } from "../parse";
 import { normalize, stem, stems } from "../text";
-import { KnowledgeIndex, type KnowledgeSource, type QuestionTopic } from "../knowledge";
+import { KnowledgeIndex, spellingPattern, type KnowledgeSource, type QuestionTopic } from "../knowledge";
 import { classifyQuestion } from "./classify";
 import { extractNamedItems } from "./entities";
 import { locateBehavior } from "./locate";
@@ -48,7 +48,8 @@ export function answerQuestion(parsed: ParsedPrompt, question: string, kb: { sou
   // existem na base?"), quem responde é o prompt — os documentos não entram.
   const baseIsSubject = classification.sourceMentioned && !classification.sourceSelected;
   if (kind !== "FATO" && !baseIsSubject) {
-    const topic = questionTopic(topicQuestion);
+    const corpus = [parsed.lines.map((l) => l.raw).join("\n"), ...kb.sources.map((s) => s.content)];
+    const topic = questionTopic(topicQuestion, corpus);
     if (topic.phrases.length || topic.words.length) {
       const index = new KnowledgeIndex(kb.sources);
       answer.knowledge = { topic: [...topic.phrases, ...topic.words.map((w) => w.word)].join(", "), consulted: kb.sources.length, scope: kb.scope, docs: index.findForQuestion(topic) };
@@ -64,12 +65,21 @@ export function answerQuestion(parsed: ParsedPrompt, question: string, kb: { sou
   return answer;
 }
 
+/** Artigos e contrações que, antes de um substantivo, marcam "o produto X", "da solução X". */
+const ARTICLES = ["o", "a", "os", "as", "do", "da", "dos", "das", "no", "na", "nos", "nas", "um", "uma"];
+
 /**
- * Assunto da pergunta para a busca nos documentos: nomes (sequências com
- * maiúscula fora do início da frase, siglas, maiúscula no meio da palavra),
- * buscados com grafia flexível, e as demais palavras de conteúdo, por radical.
+ * Assunto da pergunta para a busca nos documentos:
+ *
+ * - nomes, buscados com grafia flexível (espaço, hífen, maiúscula, acento):
+ *   sequências escritas com maiúscula/sigla, OU palavras vizinhas da pergunta
+ *   que aparecem juntas como uma unidade nas fontes ("ng essence" →
+ *   "NGEssence"), mesmo digitadas em minúsculas;
+ * - palavra que só descreve o nome logo a seguir ("o produto X", "da solução
+ *   X") não é assunto: diz o tipo da coisa, não o que procurar;
+ * - as demais palavras de conteúdo, por radical.
  */
-export function questionTopic(question: string): QuestionTopic {
+export function questionTopic(question: string, corpus: string[] = []): QuestionTopic {
   const tokens = Array.from(question.matchAll(/[\p{L}\p{N}]+/gu)).map((m) => ({ word: m[0], norm: normalize(m[0]) }));
   const ignored = (t: { norm: string }) =>
     PROMPT_REFERENCES.includes(t.norm) ||
@@ -97,9 +107,52 @@ export function questionTopic(question: string): QuestionTopic {
     i = j;
   }
 
+  // Nomes digitados sem maiúscula: palavras vizinhas que as fontes usam juntas como
+  // unidade. Entre as sequências possíveis, vale a mais usada nas fontes ("ng essence"
+  // aparece ~50 vezes; "produto ng essence", 1): é ela que nomeia a coisa.
+  const content = (i: number) => !used.has(i) && !ignored(tokens[i]) && stems(tokens[i].word).length > 0;
+  const uses = (text: string) => corpus.reduce((n, c) => n + (c.match(spellingPattern(text))?.length ?? 0), 0);
+  for (let i = 0; i < tokens.length; i++) {
+    if (!content(i)) continue;
+    let end = i;
+    while (end + 1 < tokens.length && content(end + 1)) end++;
+    for (;;) {
+      let best: { from: number; to: number; n: number } | undefined;
+      for (let from = i; from < end; from++) {
+        for (let to = from + 1; to <= end; to++) {
+          if (Array.from({ length: to - from + 1 }, (_, k) => from + k).some((k) => used.has(k))) break;
+          const n = uses(tokens.slice(from, to + 1).map((t) => t.word).join(" "));
+          if (n > 0 && (!best || n > best.n || (n === best.n && to - from > best.to - best.from))) best = { from, to, n };
+        }
+      }
+      if (!best) break;
+      phrases.push(tokens.slice(best.from, best.to + 1).map((t) => t.word).join(" "));
+      for (let k = best.from; k <= best.to; k++) used.add(k);
+    }
+    i = end;
+  }
+
+  // Palavra digitada colada que as fontes também escrevem separada ("ngessence" × "NG Essence"):
+  // é um nome. Palavra comum nunca aparece partida assim, então não vira nome.
+  tokens.forEach((t, i) => {
+    if (!content(i) || t.norm.length < 6) return;
+    const re = spellingPattern(t.word, { splitInside: true });
+    if (corpus.some((c) => Array.from(c.matchAll(re)).some((m) => /[\s\-_]/.test(m[0])))) {
+      phrases.push(t.word);
+      used.add(i);
+    }
+  });
+
+  // "o produto X": o substantivo entre o artigo e o nome só descreve o nome
+  const phraseStarts = new Set<number>();
+  tokens.forEach((t, i) => {
+    if (used.has(i) && !used.has(i - 1)) phraseStarts.add(i);
+  });
+  const descriptor = (i: number) => phraseStarts.has(i + 1) && ARTICLES.includes(tokens[i - 1]?.norm ?? "");
+
   const words: QuestionTopic["words"] = [];
   tokens.forEach((t, i) => {
-    if (used.has(i) || ignored(t)) return;
+    if (used.has(i) || ignored(t) || descriptor(i)) return;
     const [s] = stems(t.word);
     if (s && !words.some((w) => w.stem === s)) words.push({ word: t.word, stem: s });
   });
