@@ -233,6 +233,30 @@ export const ANSWER_CASES: AnswerCase[] = [
     docsExactly: ["Alpha Core", "Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP", "Alpha Emissor"],
     firstDoc: "Alpha Core",
   },
+  // Variações achadas ao testar a correção acima (registradas antes de corrigir)
+  {
+    id: "K9-erp-quais-bases-sem-qualificador",
+    prompt: "erp",
+    question: "quais bases citam o alpha emissor?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["Alpha Emissor", "Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP"],
+    firstDoc: "Alpha Emissor",
+  },
+  {
+    id: "K10-ec-documentos-que-citam",
+    prompt: "ec",
+    question: "documentos que citam o Ng-Essence",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["NGEssence Run", "NGEssence Start", "Tabela NGessence (2)", "Exemplos de interação - Agente EC", "Keevo Institucional - EC"],
+  },
+  {
+    id: "K11-ec-nome-colado-acha-separado",
+    prompt: "ec",
+    question: "quais bases falam do ngessence?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["NGEssence Run", "NGEssence Start", "Tabela NGessence (2)", "Exemplos de interação - Agente EC", "Keevo Institucional - EC"],
+    occurrences: { "NGEssence Start": 16, "Exemplos de interação - Agente EC": 3 },
+  },
   {
     // A base é o ASSUNTO (comportamento da IA sobre a base), não a fonte a consultar
     id: "K6-erp-base-como-assunto",
