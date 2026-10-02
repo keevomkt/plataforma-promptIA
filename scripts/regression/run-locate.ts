@@ -4,9 +4,10 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { parsePrompt } from "../../src/lib/engine/parse";
-import { classifyQuestion, extractNamedItems, locateBehavior } from "../../src/lib/engine/locate";
-import type { BehaviorGroup, FactResult, LocateResult } from "../../src/lib/engine/locate/types";
-import { CLASSIFY_CASES, ENTITY_CASES, LOCATE_CASES, type EntityCase, type LocateCase } from "./locate-cases";
+import { answerQuestion, classifyQuestion, extractNamedItems, locateBehavior } from "../../src/lib/engine/locate";
+import type { AskAnswer, BehaviorGroup, FactResult, LocateResult } from "../../src/lib/engine/locate/types";
+import { loadKnowledgeForPrompt } from "../../src/lib/knowledge/data";
+import { ANSWER_CASES, CLASSIFY_CASES, ENTITY_CASES, LOCATE_CASES, type AnswerCase, type EntityCase, type LocateCase } from "./locate-cases";
 
 const verbose = process.argv.includes("--verbose");
 const prisma = new PrismaClient();
@@ -100,6 +101,40 @@ function checkEntities(c: EntityCase, r: FactResult): string[] {
   return fails;
 }
 
+function checkAnswer(c: AnswerCase, r: AskAnswer): string[] {
+  const fails: string[] = [];
+  if (r.classification.kind !== c.expectKind) fails.push(`tipo ${r.classification.kind}, esperado ${c.expectKind}`);
+  const docs = r.knowledge?.docs ?? [];
+  const titles = docs.map((d) => d.title);
+  if (c.docsExactly) {
+    const exp = [...c.docsExactly].sort().join(" | ");
+    const got = [...titles].sort().join(" | ");
+    if (exp !== got) fails.push(`documentos deveriam ser [${exp}], vieram [${got}]`);
+  }
+  for (const t of c.docsIncludes ?? []) if (!titles.includes(t)) fails.push(`faltou o documento “${t}”`);
+  if (c.firstDoc && titles[0] !== c.firstDoc) fails.push(`primeiro documento deveria ser “${c.firstDoc}”, veio “${titles[0] ?? "—"}”`);
+  for (const [t, n] of Object.entries(c.occurrences ?? {})) {
+    const d = docs.find((x) => x.title === t);
+    if (d?.occurrences !== n) fails.push(`“${t}” deveria ter ${n} ocorrência(s), veio ${d?.occurrences ?? "—"}`);
+  }
+  const forms = new Set(docs.flatMap((d) => Object.keys(d.forms)));
+  for (const f of c.formsInclude ?? []) if (!forms.has(f)) fails.push(`grafia “${f}” não foi mostrada`);
+  if (c.noKnowledgeSection && docs.length) fails.push(`a base não deveria aparecer, mas trouxe: ${titles.join(", ")}`);
+  const main = r.behavior?.groups[0];
+  const mainLines = main ? main.rules.map((x) => x.line + 1) : [];
+  const missing = (c.promptMainIncludes ?? []).filter((l) => !mainLines.includes(l));
+  if (missing.length) fails.push(`faltaram no grupo principal do prompt: ${missing.map((l) => `L${l}`).join(", ")}`);
+  if (c.promptMainSection && !main?.sectionPath.includes(c.promptMainSection)) fails.push(`grupo principal do prompt deveria estar em “${c.promptMainSection}”, veio “${main?.sectionPath.join(" › ") ?? "—"}”`);
+  if (c.notInPromptAnswer) {
+    const answerLines = [
+      ...(r.behavior ? [...r.behavior.groups, ...r.behavior.sectionHits.flatMap((h) => h.groups)] : []),
+    ].flatMap((g) => g.rules.map((x) => x.line + 1));
+    const leaked = c.notInPromptAnswer.filter((l) => answerLines.includes(l));
+    if (leaked.length) fails.push(`regras sobre a fonte apareceram como resposta do prompt: ${leaked.map((l) => `L${l}`).join(", ")}`);
+  }
+  return fails;
+}
+
 async function main() {
   let failed = 0;
   let gaps = 0;
@@ -155,8 +190,29 @@ async function main() {
   }
   console.log(`${ENTITY_CASES.length - entFailed}/${ENTITY_CASES.length} extrações corretas.`);
 
+  // Resposta completa (prompt + base de conhecimento)
+  console.log("\n— Resposta completa (prompt + base de conhecimento)");
+  let ansFailed = 0;
+  for (const c of ANSWER_CASES) {
+    const prompt = await prisma.prompt.findUnique({ where: { slug: c.prompt } });
+    const kb = await loadKnowledgeForPrompt(prompt!.id);
+    const r = answerQuestion(parsePrompt(await currentContent(c.prompt)), c.question, kb);
+    const fails = checkAnswer(c, r);
+    console.log(`${fails.length ? "✗" : "✓"} ${c.id} “${c.question}”`);
+    fails.forEach((f) => console.log(`    - ${f}`));
+    if (verbose || fails.length) {
+      console.log(`  tipo: ${r.classification.kind}${r.classification.sourceSelected ? " (fonte escolhida: base)" : ""} · consultado: ${[r.consulted.prompt && "prompt", r.consulted.base && "base"].filter(Boolean).join(" + ")}`);
+      for (const d of r.knowledge?.docs ?? []) console.log(`    📄 ${d.title}: ${d.occurrences}× ${JSON.stringify(d.forms)} — ${d.excerpts.length} trecho(s)`);
+      const main = r.behavior?.groups[0];
+      if (main) console.log(`    prompt: ${main.sectionPath.join(" › ")} → ${main.rules.map((x) => `L${x.line + 1}`).join(" ")}`);
+      if (r.aboutSource?.found) console.log(`    sobre a fonte: ${[...r.aboutSource.sectionHits.flatMap((h) => h.groups), ...r.aboutSource.groups].map((g) => g.title).join(", ")}`);
+    }
+    if (fails.length) ansFailed++;
+  }
+  console.log(`${ANSWER_CASES.length - ansFailed}/${ANSWER_CASES.length} respostas corretas.`);
+
   await prisma.$disconnect();
-  process.exit(failed || classFailed || entFailed ? 1 : 0);
+  process.exit(failed || classFailed || entFailed || ansFailed ? 1 : 0);
 }
 
 main();

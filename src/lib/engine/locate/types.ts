@@ -52,8 +52,11 @@ export type SectionHit = {
   groups: BehaviorGroup[];
 };
 
-/** Tipo de pergunta: lista de itens (FATO), o que o prompt diz (COMPORTAMENTO), ou na dúvida os dois. */
-export type QuestionKind = "FATO" | "COMPORTAMENTO" | "AMBIGUO";
+/**
+ * Tipo de pergunta: lista de itens (FATO), o que o prompt diz (COMPORTAMENTO),
+ * na dúvida os dois (AMBIGUO), ou quais documentos da base falam de algo (DOCUMENTOS).
+ */
+export type QuestionKind = "FATO" | "COMPORTAMENTO" | "AMBIGUO" | "DOCUMENTOS";
 
 export type QuestionClassification = {
   kind: QuestionKind;
@@ -61,6 +64,51 @@ export type QuestionClassification = {
   listed?: string;
   /** Explicação curta da classificação, para a tela. */
   reason: string;
+  /** A pergunta indica onde procurar ("na base de conhecimento"): essas palavras saem do assunto. */
+  sourceSelected?: "BASE";
+  /** Pergunta sem as palavras que só indicam a fonte (usada como assunto da busca). */
+  topicQuestion?: string;
+};
+
+/** Um trecho literal de documento, com a grafia exata do assunto encontrada nele. */
+export type KnowledgeExcerpt = { text: string; forms: string[] };
+
+export type KnowledgeDocHit = {
+  documentId: string;
+  title: string;
+  businessUnit: string;
+  /** Quantas vezes o assunto aparece no documento inteiro. */
+  occurrences: number;
+  /** Grafias encontradas e quantas vezes cada uma ("NGEssence": 18). */
+  forms: Record<string, number>;
+  /** Palavras da pergunta encontradas no documento. */
+  matched: string[];
+  excerpts: KnowledgeExcerpt[];
+  score: number;
+};
+
+export type KnowledgeAnswer = {
+  topic: string;
+  /** Quantos documentos foram consultados (unidade + gerais). */
+  consulted: number;
+  scope: string;
+  docs: KnowledgeDocHit[];
+};
+
+/** Resposta completa da aba: cada bloco com a sua fonte, nunca misturados. */
+export type AskAnswer = {
+  question: string;
+  classification: QuestionClassification;
+  /** Regras do prompt sobre o assunto (comportamento da IA). */
+  behavior?: LocateResult;
+  /** Itens nomeados do prompt (perguntas de lista). */
+  facts?: FactResult;
+  /** Trechos dos documentos da base de conhecimento. */
+  knowledge?: KnowledgeAnswer;
+  /** Regras do prompt SOBRE a fonte citada na pergunta (ex.: como usar a base) — seção à parte. */
+  aboutSource?: LocateResult;
+  /** Fontes realmente consultadas. */
+  consulted: { prompt: boolean; base: boolean };
 };
 
 /** Um item nomeado no prompt (produto, solução, plano...), sem lista fixa no código. */

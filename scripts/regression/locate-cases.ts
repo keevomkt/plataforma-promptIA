@@ -139,6 +139,92 @@ export type EntityCase = {
   lowConfidenceIfPresent?: string[];
 };
 
+// ---------------------------------------------------------------------------
+// Resposta completa da aba (prompt + base de conhecimento). Registrado antes do
+// código da busca na base. Títulos de documento exatamente como cadastrados.
+// ---------------------------------------------------------------------------
+export type AnswerCase = {
+  id: string;
+  prompt: string;
+  question: string;
+  expectKind: "FATO" | "COMPORTAMENTO" | "AMBIGUO" | "DOCUMENTOS";
+  /** Documentos da base na resposta: exatamente estes. */
+  docsExactly?: string[];
+  /** Documentos da base na resposta: pelo menos estes. */
+  docsIncludes?: string[];
+  /** Primeiro documento da lista (o mais relacionado). */
+  firstDoc?: string;
+  /** Ocorrências do assunto contadas por documento. */
+  occurrences?: Record<string, number>;
+  /** A grafia exata encontrada precisa aparecer ao lado do trecho (ex.: "NGEssence"). */
+  formsInclude?: string[];
+  /** A base não pode aparecer como seção da resposta (nada relevante). */
+  noKnowledgeSection?: boolean;
+  /** O grupo principal do prompt precisa conter estas linhas. */
+  promptMainIncludes?: number[];
+  /** O grupo principal do prompt precisa estar numa seção cujo caminho contém este título. */
+  promptMainSection?: string;
+  /** Linhas que não podem aparecer como resposta do prompt (só, no máximo, na seção à parte sobre a fonte). */
+  notInPromptAnswer?: number[];
+};
+
+export const ANSWER_CASES: AnswerCase[] = [
+  {
+    id: "K1-ec-docs-ng-essence",
+    prompt: "ec",
+    question: "Quais são as bases de conhecimento que mencionam o NG Essence?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["NGEssence Run", "NGEssence Start", "Tabela NGessence (2)", "Exemplos de interação - Agente EC", "Keevo Institucional - EC"],
+    firstDoc: "NGEssence Run",
+    occurrences: { "NGEssence Run": 18, "NGEssence Start": 16, "Tabela NGessence (2)": 11, "Exemplos de interação - Agente EC": 3, "Keevo Institucional - EC": 1 },
+    formsInclude: ["NGEssence", "NG Essence"],
+    notInPromptAnswer: [26, 27, 28, 29, 30],
+  },
+  {
+    id: "K2-ec-preferencia-so-prompt",
+    prompt: "ec",
+    question: "Quais regras falam da preferência de contato?",
+    expectKind: "COMPORTAMENTO",
+    promptMainIncludes: [135, 137, 144, 146, 148, 150],
+    noKnowledgeSection: true,
+  },
+  {
+    id: "K3-ec-preco-duas-fontes",
+    prompt: "ec",
+    question: "Como a IA deve falar sobre o preço do NG Essence?",
+    expectKind: "COMPORTAMENTO",
+    promptMainSection: "Preço",
+    docsIncludes: ["NGEssence Run"],
+    firstDoc: "NGEssence Run",
+  },
+  {
+    id: "K4-erp-docs-alpha-core",
+    prompt: "erp",
+    question: "Quais documentos da base mencionam o Alpha Core?",
+    expectKind: "DOCUMENTOS",
+    docsExactly: ["Alpha Core", "Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP", "Alpha Emissor"],
+    firstDoc: "Alpha Core",
+    occurrences: { "Alpha Core": 10 },
+  },
+  {
+    id: "K5-hcm-preferencia-sem-base",
+    prompt: "hcm",
+    question: "Quais regras falam da preferência de contato?",
+    expectKind: "COMPORTAMENTO",
+    promptMainIncludes: [191, 193, 195, 197, 199, 201, 203],
+    noKnowledgeSection: true,
+  },
+  {
+    // A base é o ASSUNTO (comportamento da IA sobre a base), não a fonte a consultar
+    id: "K6-erp-base-como-assunto",
+    prompt: "erp",
+    question: "A IA pode dizer quais documentos existem na base de conhecimento?",
+    expectKind: "COMPORTAMENTO",
+    promptMainIncludes: [321, 322, 323, 324],
+    noKnowledgeSection: true,
+  },
+];
+
 export const ENTITY_CASES: EntityCase[] = [
   {
     id: "F1-hcm-produtos",
