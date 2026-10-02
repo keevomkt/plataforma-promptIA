@@ -14,7 +14,17 @@
  * Função pura: recebe o prompt já interpretado e não depende de banco nem de tela.
  */
 import { isRuleLine, sectionLabel, type ParsedPrompt, type PromptSection } from "../parse";
-import { normalize, sameStem, stem, stems } from "../text";
+import { normalize, sameStem as looseStem, stem, stems } from "../text";
+
+/**
+ * Mesma palavra? Radical curto (menos de 5 letras) precisa ser idêntico:
+ * "prec" (preço) não pode casar com "precis" (precisar). Os mais longos
+ * aceitam a variação de terminação de sempre.
+ */
+function sameStem(a: string, b: string): boolean {
+  if (a === b) return true;
+  return Math.min(a.length, b.length) >= 5 && looseStem(a, b);
+}
 import { buildBlocks, type Block, type BlockMap } from "./blocks";
 import { DEFINITE_ARTICLES, DEMONSTRATIVES, LEXICON_VERSION, QUESTION_META, SUBJECT_PRONOUNS } from "./lexicon";
 import { findOverlaps } from "./overlaps";

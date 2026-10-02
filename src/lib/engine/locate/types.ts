@@ -68,6 +68,10 @@ export type QuestionClassification = {
   sourceSelected?: "BASE";
   /** Pergunta sem as palavras que só indicam a fonte (usada como assunto da busca). */
   topicQuestion?: string;
+  /** A pergunta cita uma fonte da plataforma (mesmo que como assunto, não como lugar de busca). */
+  sourceMentioned?: boolean;
+  /** Como a fonte foi escrita na pergunta ("bases de conhecimento"). */
+  sourcePhrase?: string;
 };
 
 /** Um trecho literal de documento, com a grafia exata do assunto encontrada nele. */

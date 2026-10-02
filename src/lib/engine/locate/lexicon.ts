@@ -6,7 +6,7 @@
  * prompt carregado. Nenhum termo de negócio pode entrar aqui.
  * Mudou alguma lista? Suba a versão: ela é registrada em cada resultado.
  */
-export const LEXICON_VERSION = "pt-BR/2";
+export const LEXICON_VERSION = "pt-BR/3";
 
 /** Palavras da própria pergunta ou que falam sobre o prompt — nunca são o assunto. */
 export const QUESTION_META = [
@@ -80,6 +80,18 @@ export const PROMPT_REFERENCES = ["prompt", "texto", "nesse", "neste", "no", "na
 
 /** Conectivos sem peso de assunto que podem aparecer em nomes próprios ("Departamento de Pessoal"). */
 export const NAME_CONNECTORS = ["de", "da", "do", "das", "dos", "e"];
+
+// --- Fontes da própria plataforma (não são assunto de negócio) ---
+
+/** Nomes das fontes de consulta da plataforma. "base" só conta com artigo ("a base") ou com "de conhecimento". */
+export const SOURCE_NOUNS = ["base", "bases", "documento", "documentos", "arquivo", "arquivos"];
+export const SOURCE_QUALIFIER = ["de", "conhecimento"];
+/** Artigos/contrações que, antes de "base", indicam a base de conhecimento ("a base", "na base"). */
+export const SOURCE_ARTICLES = ["a", "as", "da", "das", "na", "nas", "o", "os", "do", "dos", "no", "nos"];
+/** Preposições de lugar: "na base", "nos documentos", "segundo a base" — a fonte é onde procurar. */
+export const SOURCE_LOCATIVES = ["na", "nas", "no", "nos", "pela", "pelas", "pelo", "pelos", "segundo", "conforme"];
+/** Verbos de dizer: "a base diz/menciona X" — a fonte é quem informa. */
+export const SAYING_VERBS = ["diz", "dizem", "fala", "falam", "menciona", "mencionam", "cita", "citam", "informa", "informam", "traz", "trazem", "explica", "explicam"];
 
 /** Contexto de definição logo após o nome ("X é...", "X faz parte..."). */
 export const DEFINITION_AFTER_NAME = ["é", "são", "faz parte", "fazem parte", "atende", "atendem"];

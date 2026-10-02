@@ -7,8 +7,26 @@
  * extrai nomes próprios (produtos, módulos, termos) para conferir se o que
  * entra no prompt existe na base — o prompt não deve inventar produtos.
  */
-import { conceptOf, normalize, sameStem, stems, truncate } from "./text";
+import { conceptOf, normalize, sameStem, splitSentences, stem, stems, stripAccents, truncate } from "./text";
 import type { KnowledgeRef } from "./types";
+import type { KnowledgeDocHit, KnowledgeExcerpt } from "./locate/types";
+
+/** Assunto de uma pergunta, já separado: nomes (grafia flexível) e palavras (por radical). */
+export type QuestionTopic = { phrases: string[]; words: { word: string; stem: string }[] };
+
+const ACCENTS: Record<string, string> = { a: "[aáàâãä]", e: "[eéèêë]", i: "[iíìîï]", o: "[oóòôõö]", u: "[uúùûü]", c: "[cç]", n: "[nñ]" };
+
+/**
+ * Padrão que reconhece um nome com qualquer variação de espaço, hífen,
+ * maiúscula ou acento: "NG Essence", "NGEssence", "ng-essence", "NGessence".
+ */
+export function spellingPattern(phrase: string): RegExp {
+  const parts = stripAccents(phrase.toLowerCase()).split(/[\s\-_]+/).filter(Boolean);
+  const part = (p: string) => Array.from(p).map((ch) => ACCENTS[ch] ?? ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${parts.map(part).join("[\\s\\-_]*")}(?![\\p{L}\\p{N}])`, "giu");
+}
+
+type Hit = { start: number; end: number; form: string; matcher: number };
 
 export type { KnowledgeRef };
 
@@ -125,12 +143,113 @@ export class KnowledgeIndex {
     return out;
   }
 
+  /**
+   * Busca para a aba "Perguntar ao prompt". Diferente de `search` (usada por
+   * "Alterar prompt", que não muda): sem a lista de sinônimos, conta as
+   * ocorrências no documento inteiro, traz vários trechos por documento e
+   * guarda a grafia exata encontrada.
+   *
+   * Termo raro entre os documentos pesa mais. Termo da pergunta que nenhum
+   * documento tem continua contando no total: a base só "responde" se cobre
+   * o que distingue a pergunta, não só palavras comuns.
+   */
+  findForQuestion(topic: QuestionTopic, opts: { minScore?: number; maxExcerpts?: number } = {}): KnowledgeDocHit[] {
+    const minScore = opts.minScore ?? 0.5;
+    const maxExcerpts = opts.maxExcerpts ?? 3;
+    const matchers = [
+      ...topic.phrases.map((p) => ({ label: p, phrase: true, re: spellingPattern(p) })),
+      ...topic.words.map((w) => ({ label: w.word, phrase: false, stem: w.stem })),
+    ];
+    if (!matchers.length || !this.sources.length) return [];
+
+    const perDoc = this.sources.map((source) => {
+      const hits: Hit[] = [];
+      matchers.forEach((m, k) => {
+        if ("re" in m && m.re) {
+          for (const x of Array.from(source.content.matchAll(m.re))) hits.push({ start: x.index!, end: x.index! + x[0].length, form: x[0], matcher: k });
+        } else {
+          for (const x of Array.from(source.content.matchAll(/[\p{L}\p{N}]+/gu))) {
+            if (stem(x[0]) === (m as { stem: string }).stem) hits.push({ start: x.index!, end: x.index! + x[0].length, form: x[0], matcher: k });
+          }
+        }
+      });
+      return { source, hits };
+    });
+
+    const n = this.sources.length;
+    const df = matchers.map((_, k) => perDoc.filter((d) => d.hits.some((h) => h.matcher === k)).length);
+    const weight = df.map((d) => Math.log((n + 1) / (d + 0.5)) + 0.5);
+    const total = weight.reduce((a, b) => a + b, 0);
+    const phraseIdx = matchers.map((m, k) => (m.phrase ? k : -1)).filter((k) => k >= 0);
+
+    const out: KnowledgeDocHit[] = [];
+    for (const { source, hits } of perDoc) {
+      const present = new Set(hits.map((h) => h.matcher));
+      if (phraseIdx.length && !phraseIdx.some((k) => present.has(k))) continue;
+      const score = Array.from(present).reduce((a, k) => a + weight[k], 0) / total;
+      if (score < minScore) continue;
+      const counted = hits.filter((h) => (phraseIdx.length ? matchers[h.matcher].phrase : true));
+      const forms: Record<string, number> = {};
+      for (const h of counted) forms[h.form] = (forms[h.form] ?? 0) + 1;
+      out.push({
+        documentId: source.documentId,
+        title: source.title,
+        businessUnit: source.businessUnit,
+        occurrences: counted.length,
+        forms,
+        matched: Array.from(present).map((k) => matchers[k].label),
+        excerpts: excerptsFor(source.content, hits, maxExcerpts),
+        score: Math.round(score * 100) / 100,
+      });
+    }
+    return out.sort((a, b) => b.score - a.score || b.occurrences - a.occurrences);
+  }
+
   /** O termo aparece em algum documento? (sem diferenciar maiúsculas/acentos) */
   mentions(term: string): boolean {
     const needle = normalize(term);
     if (!needle) return false;
     return this.sources.some((s) => normalize(s.content).includes(needle) || normalize(s.title).includes(needle));
   }
+}
+
+const MAX_EXCERPT = 320;
+
+/**
+ * Frases literais do documento onde o assunto aparece: as que reúnem mais
+ * termos da pergunta primeiro, mostradas na ordem do documento.
+ */
+function excerptsFor(content: string, hits: Hit[], max: number): KnowledgeExcerpt[] {
+  const sentences: { start: number; end: number; text: string }[] = [];
+  let offset = 0;
+  for (const line of content.split("\n")) {
+    let pos = 0;
+    for (const s of splitSentences(line)) {
+      const at = line.indexOf(s, pos);
+      if (s.trim()) sentences.push({ start: offset + at, end: offset + at + s.length, text: s });
+      pos = at + s.length;
+    }
+    offset += line.length + 1;
+  }
+  const scored = sentences
+    .map((s, i) => {
+      const inside = hits.filter((h) => h.start >= s.start && h.end <= s.end);
+      return { s, i, inside, distinct: new Set(inside.map((h) => h.matcher)).size };
+    })
+    .filter((x) => x.inside.length);
+  return scored
+    .sort((a, b) => b.distinct - a.distinct || a.i - b.i)
+    .slice(0, max)
+    .sort((a, b) => a.i - b.i)
+    .map(({ s, inside }) => {
+      let text = s.text.trim().replace(/\s+/g, " ");
+      if (text.length > MAX_EXCERPT) {
+        const first = inside[0].start - s.start;
+        const from = Math.max(0, first - 120);
+        text = `${from > 0 ? "…" : ""}${s.text.slice(from, from + MAX_EXCERPT).trim()}…`;
+      }
+      return { text, forms: Array.from(new Set(inside.map((h) => h.form))) };
+    });
 }
 
 /**
