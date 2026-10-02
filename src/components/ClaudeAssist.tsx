@@ -136,7 +136,7 @@ export function ClaudeAssist({ promptId, slug }: { promptId: string; slug: strin
             type="button"
             onClick={importAnswer}
             disabled={importing || !answer.trim() || !problem.trim()}
-            className="rounded border border-accent bg-white px-4 py-1.5 text-[13px] font-medium text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded border border-accent bg-surface px-4 py-1.5 text-[13px] font-medium text-accent hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-60"
           >
             {importing ? "Lendo a resposta…" : "Ver a correção na plataforma"}
           </button>

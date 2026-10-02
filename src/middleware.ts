@@ -18,7 +18,7 @@ export async function middleware(req: NextRequest) {
   if (password && !basicAuthOk(req, password)) {
     return new NextResponse("Acesso restrito ao time da Keevo.", {
       status: 401,
-      headers: { "WWW-Authenticate": 'Basic realm="Keevo Prompt Studio", charset="UTF-8"' },
+      headers: { "WWW-Authenticate": 'Basic realm="Keevo Prompt IA", charset="UTF-8"' },
     });
   }
 

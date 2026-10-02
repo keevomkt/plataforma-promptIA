@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <div className="mb-6 flex justify-center">
           <KeevoMark size={34} />
         </div>
-        <div className="overflow-hidden rounded-md border border-accent/10 bg-white shadow-pop">
+        <div className="overflow-hidden rounded-md border border-accent/10 bg-surface shadow-pop">
           <div className="keevo-gradient h-1" />
           <div className="px-6 py-6">{children}</div>
         </div>

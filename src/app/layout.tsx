@@ -17,13 +17,19 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Keevo Prompt Studio",
+  title: "Keevo Prompt IA",
   description: "Engenharia, manutenção e governança dos prompts dos agentes de IA da Keevo.",
 };
 
+// Aplica o tema antes da primeira pintura (escolha salva; senão, o do sistema), para não piscar.
+const THEME_SCRIPT = `try{var t=localStorage.getItem("tema");var d=t?t==="escuro":window.matchMedia("(prefers-color-scheme: dark)").matches;if(d)document.documentElement.classList.add("dark")}catch(e){}`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html lang="pt-BR" className={`${plexSans.variable} ${plexMono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

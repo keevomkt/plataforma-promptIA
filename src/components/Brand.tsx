@@ -10,7 +10,7 @@ export function KeevoMark({ size = 28, withText = true }: { size?: number; withT
       {withText && (
         <span className="leading-tight">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">Keevo</span>
-          <span className="block text-[15px] font-semibold text-ink">Prompt Studio</span>
+          <span className="block text-[15px] font-semibold text-ink">Prompt IA</span>
         </span>
       )}
     </span>
@@ -74,11 +74,13 @@ export function UnitLogo({
       className={clsx(
         "inline-flex shrink-0 items-center justify-center",
         !bare && "rounded-[5px]",
+        // Logo transparente com partes escuras (ex.: o "e" do eKeep): no tema escuro ganha um fundo claro
+        bare && "dark:rounded-[5px] dark:bg-white dark:px-1",
         info.tile === "dark" && "bg-[#0E1630]",
         info.tile === "light" && "border border-line bg-white",
         className
       )}
-      style={{ height, paddingInline: bare ? 0 : cropWidth ? pad : pad + 2 }}
+      style={{ height, paddingInline: bare ? undefined : cropWidth ? pad : pad + 2 }}
     >
       <span className="block overflow-hidden" style={{ width: cropWidth ?? logoWidth, height: inner }}>
         <Image

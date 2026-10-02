@@ -1,4 +1,4 @@
-# Keevo Prompt Studio
+# Keevo Prompt IA
 
 Plataforma interna de **engenharia, manutenção e governança de prompts** dos agentes de IA da Keevo.
 

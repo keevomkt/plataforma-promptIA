@@ -94,7 +94,7 @@ export function UserRowActions({ user }: { user: AdminUserRow }) {
       {error && <p className="text-[12px] text-removed">{error}</p>}
       {tempPassword && (
         <div className="rounded border border-warn-border bg-warn-bg px-3 py-2 text-[12.5px] text-warn">
-          Senha provisória de {user.name}: <code className="select-all rounded bg-white px-1.5 py-0.5 font-mono text-[13px] text-ink">{tempPassword}</code>
+          Senha provisória de {user.name}: <code className="select-all rounded bg-surface px-1.5 py-0.5 font-mono text-[13px] text-ink">{tempPassword}</code>
           <span className="mt-0.5 block text-[11.5px]">Copie e envie à pessoa agora — ela não será mostrada de novo. No primeiro acesso, ela terá de criar a própria senha.</span>
         </div>
       )}

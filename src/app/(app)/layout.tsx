@@ -3,7 +3,7 @@ import { listPrompts } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/session";
 import { SidebarLink } from "@/components/SidebarLink";
-import { UserMenu } from "@/components/auth/UserMenu";
+import { TopBar } from "@/components/TopBar";
 import { KeevoMark, UnitLogo } from "@/components/Brand";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const pending = user.role === "ADMIN" ? await prisma.user.count({ where: { status: "PENDENTE" } }) : 0;
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <aside className="sidebar-surface flex w-60 shrink-0 flex-col border-r border-accent/10">
         <div className="keevo-gradient h-1" />
         <Link href="/" className="block border-b border-accent/10 px-4 py-4">
@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </li>
             ))}
           </ul>
-          <Link href="/?novo=1" className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-white/80">
+          <Link href="/?novo=1" className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-surface/80">
             + Novo prompt
           </Link>
 
@@ -75,12 +75,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )}
         </nav>
 
-        <div className="border-t border-accent/10 px-3 py-3">
-          <UserMenu name={user.name} email={user.email} role={user.role} />
-        </div>
       </aside>
 
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar name={user.name} email={user.email} role={user.role} />
+        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+      </div>
     </div>
   );
 }

@@ -2,45 +2,108 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
+/* Cores do tema (R G B). Claro por padrão; escuro com a classe `dark` no <html>. */
+:root {
+  --paper: 247 246 250;
+  --surface: 255 255 255;
+  --sunken: 241 239 245;
+  --ink: 24 27 32;
+  --ink-soft: 60 65 72;
+  --ink-faint: 107 113 120;
+  --line: 228 225 234;
+  --line-strong: 203 198 214;
+  --accent: 122 31 201;
+  --accent-soft: 244 234 253;
+  --accent-strong: 90 18 150;
+  --added: 30 123 77;
+  --added-bg: 233 246 238;
+  --added-border: 191 227 204;
+  --removed: 179 38 30;
+  --removed-bg: 251 234 234;
+  --removed-border: 240 196 193;
+  --warn: 150 96 24;
+  --warn-bg: 251 241 223;
+  --warn-border: 236 214 166;
   color-scheme: light;
 }
 
+.dark {
+  --paper: 14 12 19;
+  --surface: 23 20 31;
+  --sunken: 31 27 41;
+  --ink: 236 234 242;
+  --ink-soft: 190 185 204;
+  --ink-faint: 138 133 152;
+  --line: 44 39 56;
+  --line-strong: 64 57 80;
+  --accent: 157 92 235;
+  --accent-soft: 42 31 61;
+  --accent-strong: 204 166 248;
+  --added: 92 201 138;
+  --added-bg: 18 39 27;
+  --added-border: 31 74 49;
+  --removed: 240 123 115;
+  --removed-bg: 46 21 19;
+  --removed-border: 90 38 34;
+  --warn: 227 176 98;
+  --warn-bg: 43 33 18;
+  --warn-border: 90 68 33;
+  color-scheme: dark;
+}
+
 body {
-  background-color: #f7f6fa;
-  color: #181b20;
+  background-color: rgb(var(--paper));
+  color: rgb(var(--ink));
 }
 
 ::selection {
-  background-color: #e6d2fa;
+  background-color: rgb(var(--accent) / 0.25);
 }
 
-/* CodeMirror: ajusta o editor ao restante da tipografia do app */
+/* No escuro, "accent-strong" é um lilás claro (bom para texto); botões roxos não podem clarear ao passar o mouse */
+.dark .hover\:bg-accent-strong:hover {
+  background-color: rgb(124 58 200);
+}
+
+/* CodeMirror: ajusta o editor ao restante da tipografia e ao tema */
 .cm-editor {
   font-size: 13.5px;
   height: 100%;
+  background-color: rgb(var(--surface));
+  color: rgb(var(--ink));
 }
 .cm-editor.cm-focused {
   outline: none !important;
 }
 .cm-gutters {
-  background-color: #faf9fc !important;
-  border-right: 1px solid #e4e1ea !important;
-  color: #9a9c9f !important;
+  background-color: rgb(var(--sunken)) !important;
+  border-right: 1px solid rgb(var(--line)) !important;
+  color: rgb(var(--ink-faint)) !important;
 }
 .cm-activeLineGutter,
 .cm-activeLine {
-  background-color: #f6effd !important;
+  background-color: rgb(var(--accent-soft) / 0.7) !important;
+}
+.cm-cursor {
+  border-left-color: rgb(var(--ink)) !important;
+}
+.cm-selectionBackground,
+.cm-focused .cm-selectionBackground {
+  background-color: rgb(var(--accent) / 0.25) !important;
 }
 .cm-scroller {
   font-family: var(--font-plex-mono), ui-monospace, monospace !important;
   line-height: 1.55;
 }
 .cm-searchMatch {
-  background-color: #fbf1df !important;
+  background-color: rgb(var(--warn-bg)) !important;
 }
 .cm-searchMatch-selected {
-  background-color: #ecd6a6 !important;
+  background-color: rgb(var(--warn-border)) !important;
+}
+.cm-panels {
+  background-color: rgb(var(--sunken)) !important;
+  color: rgb(var(--ink)) !important;
 }
 
 /* Faixa em degradê com as cores da logo Keevo (detalhe de marca) */
@@ -53,7 +116,7 @@ body {
   position: relative;
   height: 3px;
   overflow: hidden;
-  background: rgba(122, 31, 201, 0.12);
+  background: rgb(var(--accent) / 0.12);
 }
 .loading-bar::after {
   content: "";
@@ -76,4 +139,9 @@ body {
   background:
     radial-gradient(120% 45% at 0% 0%, rgba(138, 18, 214, 0.12) 0%, rgba(138, 18, 214, 0) 70%),
     linear-gradient(180deg, #f5edfe 0%, #faf6ff 40%, #ffffff 100%);
+}
+.dark .sidebar-surface {
+  background:
+    radial-gradient(120% 45% at 0% 0%, rgba(157, 92, 235, 0.22) 0%, rgba(157, 92, 235, 0) 70%),
+    linear-gradient(180deg, #1c1528 0%, #17131f 45%, #131019 100%);
 }

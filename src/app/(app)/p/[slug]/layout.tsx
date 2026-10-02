@@ -14,7 +14,7 @@ export default async function PromptLayout({ children, params }: { children: Rea
   const unit = resolveUnit(prompt.businessUnit);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-full flex-col">
       <header className="border-b border-line bg-surface px-6 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <div className="flex min-w-0 items-center gap-3">

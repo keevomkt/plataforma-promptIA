@@ -27,7 +27,7 @@ const KIND_LABELS: Record<LineKind, string> = {
   code: "Bloco de código",
 };
 
-const editorTheme = EditorView.theme({ "&": { backgroundColor: "#ffffff" } });
+const editorTheme = EditorView.theme({ "&": { backgroundColor: "transparent" } });
 
 export function PromptWorkspace(props: {
   promptId: string;
