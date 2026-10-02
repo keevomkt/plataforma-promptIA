@@ -150,7 +150,7 @@ export async function applyChange(
 export async function reopenChange(changeId: string): Promise<ActionResult<null>> {
   await requireUser();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
-  if (!change || change.status !== "APLICADA" || !["PEDIDO", "DIAGNOSTICO"].includes(change.kind)) {
+  if (!change || change.status !== "APLICADA" || !["PEDIDO", "DIAGNOSTICO", "CLAUDE"].includes(change.kind)) {
     return { ok: false, error: "Só é possível editar alterações aplicadas e ainda não salvas." };
   }
   await prisma.changeRequest.update({

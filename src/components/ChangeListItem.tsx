@@ -8,7 +8,7 @@ import { Card, CardBody, ImpactPill, StatusPill } from "@/components/ui/Surfaces
 import { deleteChange } from "@/lib/actions/changes";
 
 const DELETABLE = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
-const KIND_LABELS: Record<string, string> = { DIAGNOSTICO: "Diagnóstico de conversa" };
+const KIND_LABELS: Record<string, string> = { DIAGNOSTICO: "Diagnóstico de conversa", CLAUDE: "Correção do Claude" };
 
 export function ChangeListItem({
   slug,

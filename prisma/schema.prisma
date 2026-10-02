@@ -22,6 +22,7 @@ datasource db {
 // SQLite não suporta enums no Prisma: os campos de status são String e os
 // valores válidos ficam documentados aqui.
 // ChangeRequest.kind:   PEDIDO (linguagem natural) | DIAGNOSTICO (a partir de uma conversa real, via IA opcional)
+//                       | CLAUDE (correção feita no claude.ai e colada de volta)
 //                       | MANUAL (edição direta no editor) | PARAMETROS (temperatura/Top P)
 //                       | RESTAURACAO | IMPORTACAO
 // ChangeRequest.status: AGUARDANDO_ESCLARECIMENTO | AGUARDANDO_APROVACAO | SEM_ALTERACAO

@@ -35,7 +35,7 @@ export default async function VersionPage({ params }: { params: { slug: string; 
           <Meta label="Temperatura" value={String(version.temperature)} mono />
           <Meta label="Top P" value={String(version.topP)} mono />
           <Meta label="Tamanho" value={`${formatCount(version.content.length)} caracteres · ~${formatCount(estimateTokens(version.content))} tokens`} wide />
-          {change && ["PEDIDO", "MANUAL", "DIAGNOSTICO"].includes(change.kind) && (
+          {change && ["PEDIDO", "MANUAL", "DIAGNOSTICO", "CLAUDE"].includes(change.kind) && (
             <div className="col-span-2 sm:col-span-4">
               <Link href={`/p/${prompt.slug}/alterar/${change.id}`} className="text-xs font-medium text-accent hover:underline">
                 Ver a análise e a validação desta alteração →

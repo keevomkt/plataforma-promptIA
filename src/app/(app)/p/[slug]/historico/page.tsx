@@ -9,6 +9,7 @@ import { ComparePicker } from "@/components/ComparePicker";
 const KIND_LABELS: Record<string, string> = {
   PEDIDO: "Alteração solicitada",
   DIAGNOSTICO: "Diagnóstico de conversa",
+  CLAUDE: "Correção do Claude",
   MANUAL: "Edição manual",
   PARAMETROS: "Parâmetros",
   RESTAURACAO: "Restauração",

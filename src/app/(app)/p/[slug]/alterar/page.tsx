@@ -1,5 +1,6 @@
 import { getPromptBySlug, listChanges } from "@/lib/data";
 import { ChangeRequestForm } from "@/components/ChangeRequestForm";
+import { ClaudeAssist } from "@/components/ClaudeAssist";
 import { ChangeListItem } from "@/components/ChangeListItem";
 import { ClearDeadChangesButton } from "@/components/ClearDeadChangesButton";
 import { Eyebrow } from "@/components/ui/Surfaces";
@@ -9,13 +10,15 @@ const DELETABLE = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDID
 
 export default async function ChangePage({ params, searchParams }: { params: { slug: string }; searchParams: { pedido?: string } }) {
   const prompt = await getPromptBySlug(params.slug);
-  const changes = (await listChanges(prompt.id)).filter((c) => c.kind === "PEDIDO" || c.kind === "MANUAL" || c.kind === "DIAGNOSTICO");
+  const changes = (await listChanges(prompt.id)).filter((c) => c.kind === "PEDIDO" || c.kind === "MANUAL" || c.kind === "DIAGNOSTICO" || c.kind === "CLAUDE");
   const open = changes.filter((c) => OPEN.includes(c.status));
   const recent = changes.filter((c) => !OPEN.includes(c.status)).slice(0, 8);
   const deadCount = changes.filter((c) => DELETABLE.includes(c.status)).length;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
+      <ClaudeAssist promptId={prompt.id} slug={prompt.slug} />
+
       <ChangeRequestForm promptId={prompt.id} slug={prompt.slug} initial={searchParams.pedido ?? ""} />
 
 

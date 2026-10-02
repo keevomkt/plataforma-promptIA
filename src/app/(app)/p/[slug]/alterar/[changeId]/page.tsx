@@ -32,6 +32,7 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
   const stale = isOpen && change.fromVersion && current && current.id !== change.fromVersionId;
   const isManual = change.kind === "MANUAL";
   const isDiagnosis = change.kind === "DIAGNOSTICO";
+  const isClaude = change.kind === "CLAUDE";
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-6 py-6">
@@ -49,6 +50,8 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
                   ? "Edição manual"
                   : isDiagnosis
                     ? "Diagnóstico de conversa"
+                    : isClaude
+                    ? "Correção sugerida pelo Claude"
                     : analysis?.audit
                       ? "Revisão do prompt"
                       : analysis?.answer
@@ -85,10 +88,10 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
       {stale && change.fromVersion && current && change.kind === "PEDIDO" && (
         <StaleBanner changeId={change.id} slug={prompt.slug} fromVersion={change.fromVersion.version} currentVersion={current.version} />
       )}
-      {stale && change.fromVersion && current && isDiagnosis && (
+      {stale && change.fromVersion && current && (isDiagnosis || isClaude) && (
         <p className="rounded border border-warn-border bg-warn-bg px-4 py-3 text-sm text-warn">
-          O prompt mudou desde este diagnóstico (feito sobre a v{change.fromVersion.version}, versão atual v{current.version}). Para
-          aplicar sobre o prompt atual, refaça o diagnóstico na aba{" "}
+          O prompt mudou desde {isClaude ? "esta correção" : "este diagnóstico"} (feito sobre a v{change.fromVersion.version}, versão atual v{current.version}). Para
+          aplicar sobre o prompt atual, {isClaude ? "leve o problema ao Claude de novo" : "refaça o diagnóstico"} na aba{" "}
           <Link href={`/p/${prompt.slug}/alterar`} className="underline">
             Alterar prompt
           </Link>
@@ -96,7 +99,7 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
         </p>
       )}
 
-      {isDiagnosis && analysis?.conversationInput && (
+      {(isDiagnosis || isClaude) && analysis?.conversationInput && (
         <Card>
           <CardBody className="space-y-3">
             {analysis.conversationInput.transcript && (
@@ -116,6 +119,18 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
             </div>
           </CardBody>
         </Card>
+      )}
+
+      {isClaude && analysis?.pastedAnswer && (
+        <details className="group rounded border border-line bg-surface shadow-panel">
+          <summary className="cursor-pointer list-none px-4 py-3">
+            <Eyebrow className="inline">Resposta do Claude, como foi colada</Eyebrow>
+            <span className="ml-1.5 text-[11px] text-ink-faint group-open:hidden">mostrar</span>
+          </summary>
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t border-line bg-sunken px-4 py-3 font-mono text-[12px] text-ink-soft">
+            {analysis.pastedAnswer}
+          </pre>
+        </details>
       )}
 
       {/* Ambiguidade: a pergunta vem antes de tudo, porque sem a resposta nada pode ser proposto */}

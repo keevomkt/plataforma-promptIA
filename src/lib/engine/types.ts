@@ -87,6 +87,8 @@ export type ChangeAnalysis = {
   answer?: AnswerResult;
   /** Presente só em diagnósticos gerados a partir de uma conversa real (ver src/lib/ai/diagnose.ts). */
   conversationInput?: { transcript?: string; hadImage: boolean; expectedBehavior: string };
+  /** Resposta do Claude colada na plataforma, guardada como veio (correções feitas no claude.ai). */
+  pastedAnswer?: string;
 };
 
 export type AnswerResult = {
