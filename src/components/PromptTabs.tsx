@@ -24,7 +24,7 @@ export function PromptTabs({ slug, openChanges }: { slug: string; openChanges: n
   ];
 
   return (
-    <nav className="mt-2 flex gap-1">
+    <nav className="flex gap-1">
       {tabs.map((tab) => (
         <Link
           key={tab.href}

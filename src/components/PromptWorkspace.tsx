@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Form";
 import { Card, CardBody, CardHeader, Eyebrow } from "@/components/ui/Surfaces";
 import { submitManualEdit, updateParams } from "@/lib/actions/prompts";
-import { parsePrompt, structureSummary, visibleSections, type LineKind } from "@/lib/engine/parse";
+import { parsePrompt, structureSummary, visibleSections, type LineKind, type PromptSection } from "@/lib/engine/parse";
 import { splitSentences } from "@/lib/engine/text";
 import { countWords, estimateTokens, formatCount } from "@/lib/tokens";
 import { UnitPicker } from "@/components/UnitPicker";
@@ -31,6 +31,7 @@ const KIND_LABELS: Record<LineKind, string> = {
 
 const editorTheme = EditorView.theme({ "&": { backgroundColor: "transparent" } });
 const DETAILS_KEY = "painel-detalhes";
+const SECTIONS_KEY = "painel-secoes";
 
 export function PromptWorkspace(props: {
   promptId: string;
@@ -49,25 +50,25 @@ export function PromptWorkspace(props: {
   const [cursorLine, setCursorLine] = useState<number | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [isSaving, startSaving] = useTransition();
-  // Painel da direita (regra selecionada, configuração, estrutura): oculto por padrão, lembrado no navegador
-  const [showDetails, setShowDetails] = useState(false);
-  useEffect(() => {
-    try {
-      setShowDetails(localStorage.getItem(DETAILS_KEY) === "1");
-    } catch {}
-  }, []);
-  function toggleDetails() {
-    setShowDetails((v) => {
-      try {
-        localStorage.setItem(DETAILS_KEY, v ? "0" : "1");
-      } catch {}
-      return !v;
-    });
-  }
+  // Painel da direita (regra selecionada, configuração, estrutura): oculto por padrão.
+  // Índice de seções: visível por padrão. As duas escolhas ficam lembradas no navegador.
+  const [showDetails, toggleDetails] = useRemembered(DETAILS_KEY, false);
+  const [showSections, toggleSections] = useRemembered(SECTIONS_KEY, true);
 
   const dirty = content !== props.content;
   const parsed = useMemo(() => parsePrompt(content), [content]);
   const sections = useMemo(() => visibleSections(parsed), [parsed]);
+  const children = useMemo(() => {
+    const map = new Map<number | null, PromptSection[]>();
+    const ids = new Set(sections.map((x) => x.id));
+    for (const sec of sections) {
+      const parent = sec.parentId !== null && sec.parentId !== 0 && ids.has(sec.parentId) ? sec.parentId : null;
+      map.set(parent, [...(map.get(parent) ?? []), sec]);
+    }
+    return map;
+  }, [sections]);
+  // Índice recolhido: só os títulos principais; abre na seta, ou sozinho até a seção onde está o cursor
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const summary = useMemo(() => structureSummary(parsed), [parsed]);
 
   const cursorListener = useMemo(
@@ -149,6 +150,18 @@ export function PromptWorkspace(props: {
 
   const line = cursorLine !== null ? parsed.lines[cursorLine] : undefined;
   const lineSection = line ? parsed.sections[line.sectionId] : undefined;
+  const activeSectionId = lineSection?.id;
+  // Cursor dentro de uma subseção: abre o caminho até ela no índice
+  useEffect(() => {
+    if (activeSectionId === undefined) return;
+    const chain: number[] = [];
+    let cur = parsed.sections[activeSectionId]?.parentId ?? null;
+    while (cur !== null && cur !== 0) {
+      chain.push(cur);
+      cur = parsed.sections[cur]?.parentId ?? null;
+    }
+    if (chain.length) setExpanded((prev) => (chain.every((c) => prev.has(c)) ? prev : new Set([...Array.from(prev), ...chain])));
+  }, [activeSectionId, parsed]);
   const sentences = line && line.kind !== "heading" && line.text ? splitSentences(line.text) : [];
   const changeHref =
     line && lineSection && line.text && line.kind !== "blank"
@@ -159,29 +172,35 @@ export function PromptWorkspace(props: {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* Navegação por seções */}
-      <aside className="hidden w-56 shrink-0 overflow-y-auto border-r border-line bg-surface py-3 lg:block">
-        <Eyebrow className="px-4 pb-1.5">Seções</Eyebrow>
-        <ul>
-          {sections.map((s) => {
-            const active = lineSection?.id === s.id;
-            return (
-              <li key={s.id}>
-                <button
-                  onClick={() => goToLine(s.headingLine >= 0 ? s.headingLine : 0)}
-                  className={clsx(
-                    "block w-full truncate py-1 pr-3 text-left text-[12.5px] hover:bg-sunken",
-                    active ? "font-medium text-accent-strong" : s.path.length <= 1 ? "text-ink" : "text-ink-soft"
-                  )}
-                  style={{ paddingLeft: `${16 + Math.max(0, s.path.length - 1) * 12}px` }}
-                  title={s.path.join(" › ") || s.title}
-                >
-                  {s.id === 0 ? <span className="italic text-ink-faint">Início do prompt</span> : s.title}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+      {/* Navegação por seções (recolhível) */}
+      <aside className={clsx("hidden w-56 shrink-0 overflow-y-auto border-r border-line bg-surface py-3", showSections && "lg:block")}>
+        <div className="flex items-center justify-between px-4 pb-1.5">
+          <Eyebrow>Seções</Eyebrow>
+          {expanded.size > 0 && (
+            <button onClick={() => setExpanded(new Set())} className="text-[11px] text-ink-faint hover:text-ink-soft">
+              Recolher tudo
+            </button>
+          )}
+        </div>
+        <SectionTree
+          nodes={children.get(null) ?? []}
+          childrenOf={(id) => children.get(id) ?? []}
+          depth={0}
+          expanded={expanded}
+          activeId={lineSection?.id}
+          onToggle={(id) =>
+            setExpanded((prev) => {
+              const next = new Set(prev);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
+              return next;
+            })
+          }
+          onGo={(sec) => {
+            goToLine(sec.headingLine >= 0 ? sec.headingLine : 0);
+            if ((children.get(sec.id) ?? []).length) setExpanded((prev) => new Set(prev).add(sec.id));
+          }}
+        />
       </aside>
 
       {/* Editor */}
@@ -196,6 +215,17 @@ export function PromptWorkspace(props: {
             {dirty && <span className="rounded-sm border border-warn-border bg-warn-bg px-1.5 py-0.5 text-warn">Edição não salva</span>}
           </div>
           <div className="flex flex-wrap items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleSections}
+              title={showSections ? "Ocultar o índice de seções" : "Mostrar o índice de seções"}
+              aria-pressed={showSections}
+              className={clsx("hidden lg:inline-flex", showSections && "text-accent")}
+            >
+              <ListIcon />
+              Seções
+            </Button>
             <Button
               size="sm"
               variant="ghost"
@@ -325,6 +355,99 @@ export function PromptWorkspace(props: {
         </Card>
       </aside>
     </div>
+  );
+}
+
+/** Preferência de exibição lembrada no navegador (começa no padrão para não divergir do servidor). */
+function useRemembered(key: string, initial: boolean): [boolean, () => void] {
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved !== null) setValue(saved === "1");
+    } catch {}
+  }, [key]);
+  const toggle = useCallback(() => {
+    setValue((v) => {
+      try {
+        localStorage.setItem(key, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  }, [key]);
+  return [value, toggle];
+}
+
+function SectionTree({
+  nodes,
+  childrenOf,
+  depth,
+  expanded,
+  activeId,
+  onToggle,
+  onGo,
+}: {
+  nodes: PromptSection[];
+  childrenOf: (id: number) => PromptSection[];
+  depth: number;
+  expanded: Set<number>;
+  activeId?: number;
+  onToggle: (id: number) => void;
+  onGo: (s: PromptSection) => void;
+}) {
+  return (
+    <ul>
+      {nodes.map((sec) => {
+        const kids = childrenOf(sec.id);
+        const open = expanded.has(sec.id);
+        const active = activeId === sec.id;
+        return (
+          <li key={sec.id}>
+            <div className={clsx("flex items-center pr-2 hover:bg-sunken", active && "bg-accent-soft/50")} style={{ paddingLeft: 6 + depth * 12 }}>
+              {kids.length ? (
+                <button
+                  onClick={() => onToggle(sec.id)}
+                  className="flex h-6 w-5 shrink-0 items-center justify-center text-ink-faint hover:text-ink"
+                  aria-label={(open ? "Recolher " : "Abrir ") + sec.title}
+                  aria-expanded={open}
+                >
+                  <svg viewBox="0 0 12 12" width="10" height="10" className={clsx("transition-transform", open && "rotate-90")} aria-hidden>
+                    <path d="M4 2.5 7.5 6 4 9.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ) : (
+                <span className="w-5 shrink-0" />
+              )}
+              <button
+                onClick={() => onGo(sec)}
+                className={clsx(
+                  "min-w-0 flex-1 truncate py-1 text-left text-[12.5px]",
+                  active ? "font-medium text-accent-strong" : depth === 0 ? "text-ink" : "text-ink-soft"
+                )}
+                title={sec.path.join(" › ") || sec.title}
+              >
+                {sec.id === 0 ? <span className="italic text-ink-faint">Início do prompt</span> : sec.title}
+                {kids.length > 0 && !open && <span className="ml-1 text-[11px] text-ink-faint">({kids.length})</span>}
+              </button>
+            </div>
+            {open && kids.length > 0 && (
+              <SectionTree nodes={kids} childrenOf={childrenOf} depth={depth + 1} expanded={expanded} activeId={activeId} onToggle={onToggle} onGo={onGo} />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ListIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M7 5h10M7 10h10M7 15h10" strokeLinecap="round" />
+      <circle cx="3.5" cy="5" r="0.9" fill="currentColor" />
+      <circle cx="3.5" cy="10" r="0.9" fill="currentColor" />
+      <circle cx="3.5" cy="15" r="0.9" fill="currentColor" />
+    </svg>
   );
 }
 

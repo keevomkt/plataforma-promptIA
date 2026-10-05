@@ -9,8 +9,22 @@ import { KeevoMark, UnitLogo } from "@/components/Brand";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const prompts = await listPrompts();
-  const knowledgeCount = await prisma.knowledgeDocument.count();
-  const pending = user.role === "ADMIN" ? await prisma.user.count({ where: { status: "PENDENTE" } }) : 0;
+  const [knowledgeCount, pending, versions] = await Promise.all([
+    prisma.knowledgeDocument.count(),
+    user.role === "ADMIN" ? prisma.user.count({ where: { status: "PENDENTE" } }) : Promise.resolve(0),
+    prisma.promptVersion.findMany({
+      where: { id: { in: prompts.flatMap((p) => (p.currentVersionId ? [p.currentVersionId] : [])) } },
+      select: { id: true, version: true },
+    }),
+  ]);
+  // Título do prompt aberto, mostrado na barra superior
+  const titles = prompts.map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    description: p.description,
+    unit: p.businessUnit,
+    version: versions.find((v) => v.id === p.currentVersionId)?.version ?? null,
+  }));
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -79,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar name={user.name} email={user.email} role={user.role} />
+        <TopBar name={user.name} email={user.email} role={user.role} prompts={titles} />
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>

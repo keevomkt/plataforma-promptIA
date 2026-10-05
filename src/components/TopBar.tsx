@@ -1,19 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { UnitLogo } from "@/components/Brand";
 import { logout } from "@/lib/actions/auth";
 
 const iconButton =
   "flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface text-ink-soft transition-colors hover:border-line-strong hover:text-ink";
 
-/** Barra superior: alternar tema e menu do perfil. */
-export function TopBar({ name, email, role }: { name: string; email: string; role: "ADMIN" | "USUARIO" }) {
+type PromptTitle = { slug: string; name: string; description: string | null; unit: string | null; version: number | null };
+
+/** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema e perfil à direita. */
+export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: "ADMIN" | "USUARIO"; prompts: PromptTitle[] }) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-end gap-2 border-b border-line bg-surface/80 px-5 backdrop-blur">
-      <ThemeToggle />
-      <ProfileMenu name={name} email={email} role={role} />
+    <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/80 px-6 backdrop-blur">
+      <CurrentPrompt prompts={prompts} />
+      <div className="flex shrink-0 items-center gap-2">
+        <ThemeToggle />
+        <ProfileMenu name={name} email={email} role={role} />
+      </div>
     </div>
+  );
+}
+
+function CurrentPrompt({ prompts }: { prompts: PromptTitle[] }) {
+  const pathname = usePathname();
+  const slug = /^\/p\/([^/]+)/.exec(pathname)?.[1];
+  const prompt = slug ? prompts.find((p) => p.slug === decodeURIComponent(slug)) : undefined;
+  if (!prompt) return <span />;
+  return (
+    <Link href={`/p/${prompt.slug}`} className="flex min-w-0 items-center gap-3" title={prompt.description ?? prompt.name}>
+      {prompt.unit ? (
+        <UnitLogo unit={prompt.unit} height={30} priority />
+      ) : (
+        <span className="h-[30px] w-[30px] shrink-0 rounded-md border border-dashed border-line-strong" />
+      )}
+      <h1 className="truncate text-[16px] font-semibold text-ink">{prompt.name}</h1>
+      {prompt.version !== null && (
+        <span className="shrink-0 rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent-strong">v{prompt.version}</span>
+      )}
+    </Link>
   );
 }
 
