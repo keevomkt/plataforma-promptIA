@@ -16,7 +16,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="flex h-screen overflow-hidden">
       <aside className="sidebar-surface flex w-60 shrink-0 flex-col border-r border-accent/10">
         <div className="keevo-gradient h-1" />
-        <Link href="/" className="block border-b border-accent/10 px-4 py-4">
+        {/* 4 px da faixa + 52 px = 56 px, a mesma altura da barra superior: as duas linhas de baixo ficam alinhadas */}
+        <Link href="/" className="flex h-[52px] shrink-0 items-center border-b border-accent/10 px-4">
           <KeevoMark />
         </Link>
 

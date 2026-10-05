@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
@@ -30,6 +30,7 @@ const KIND_LABELS: Record<LineKind, string> = {
 };
 
 const editorTheme = EditorView.theme({ "&": { backgroundColor: "transparent" } });
+const DETAILS_KEY = "painel-detalhes";
 
 export function PromptWorkspace(props: {
   promptId: string;
@@ -48,6 +49,21 @@ export function PromptWorkspace(props: {
   const [cursorLine, setCursorLine] = useState<number | null>(null);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [isSaving, startSaving] = useTransition();
+  // Painel da direita (regra selecionada, configuração, estrutura): oculto por padrão, lembrado no navegador
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => {
+    try {
+      setShowDetails(localStorage.getItem(DETAILS_KEY) === "1");
+    } catch {}
+  }, []);
+  function toggleDetails() {
+    setShowDetails((v) => {
+      try {
+        localStorage.setItem(DETAILS_KEY, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  }
 
   const dirty = content !== props.content;
   const parsed = useMemo(() => parsePrompt(content), [content]);
@@ -180,6 +196,17 @@ export function PromptWorkspace(props: {
             {dirty && <span className="rounded-sm border border-warn-border bg-warn-bg px-1.5 py-0.5 text-warn">Edição não salva</span>}
           </div>
           <div className="flex flex-wrap items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={toggleDetails}
+              title={showDetails ? "Ocultar detalhes da regra, configuração e estrutura" : "Mostrar detalhes da regra, configuração e estrutura"}
+              aria-pressed={showDetails}
+              className={clsx("hidden xl:inline-flex", showDetails && "text-accent")}
+            >
+              <EyeIcon open={showDetails} />
+              Detalhes
+            </Button>
             <Button size="sm" variant="ghost" onClick={openSearch}>
               Buscar
             </Button>
@@ -222,7 +249,7 @@ export function PromptWorkspace(props: {
       </section>
 
       {/* Inspetor + parâmetros */}
-      <aside className="hidden w-80 shrink-0 space-y-4 overflow-y-auto border-l border-line bg-paper p-4 xl:block">
+      <aside className={clsx("hidden w-80 shrink-0 space-y-4 overflow-y-auto border-l border-line bg-paper p-4", showDetails && "xl:block")}>
         <Card>
           <CardHeader className="py-2.5">
             <span className="text-sm font-medium text-ink">Regra selecionada</span>
@@ -298,6 +325,16 @@ export function PromptWorkspace(props: {
         </Card>
       </aside>
     </div>
+  );
+}
+
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+      <path d="M1.8 10S4.8 4.5 10 4.5 18.2 10 18.2 10 15.2 15.5 10 15.5 1.8 10 1.8 10Z" strokeLinejoin="round" />
+      <circle cx="10" cy="10" r="2.6" />
+      {!open && <path d="M3 17 17 3" strokeLinecap="round" />}
+    </svg>
   );
 }
 
