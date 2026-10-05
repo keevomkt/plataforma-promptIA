@@ -11,13 +11,14 @@ const iconButton =
 
 type PromptTitle = { slug: string; name: string; description: string | null; unit: string | null; version: number | null };
 
-/** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema e perfil à direita. */
+/** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema, configurações e perfil à direita. */
 export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: "ADMIN" | "USUARIO"; prompts: PromptTitle[] }) {
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/80 px-6 backdrop-blur">
       <CurrentPrompt prompts={prompts} />
       <div className="flex shrink-0 items-center gap-2">
         <ThemeToggle />
+        <SettingsMenu />
         <ProfileMenu name={name} email={email} role={role} />
       </div>
     </div>
@@ -65,12 +66,10 @@ export function ThemeToggle() {
   );
 }
 
-function ProfileMenu({ name, email, role }: { name: string; email: string; role: "ADMIN" | "USUARIO" }) {
+/** Menu que fecha ao clicar fora ou apertar Esc. */
+function useMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const initial = name.trim().charAt(0).toUpperCase() || "?";
-  const firstName = name.trim().split(/\s+/)[0];
-
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
@@ -84,6 +83,56 @@ function ProfileMenu({ name, email, role }: { name: string; email: string; role:
       document.removeEventListener("keydown", esc);
     };
   }, [open]);
+  return { open, setOpen, ref };
+}
+
+/** Configurações. Por enquanto, só sair da conta. */
+function SettingsMenu() {
+  const { open, setOpen, ref } = useMenu();
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={iconButton}
+        title="Configurações"
+        aria-label="Configurações"
+      >
+        <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+          <circle cx="10" cy="10" r="2.6" />
+          <path
+            d="M8.6 2.5h2.8l.4 2.1 1.5.9 2-.8 1.4 2.4-1.6 1.4v1.7l1.6 1.4-1.4 2.4-2-.8-1.5.9-.4 2.1H8.6l-.4-2.1-1.5-.9-2 .8-1.4-2.4 1.6-1.4V9.2L3.3 7.8l1.4-2.4 2 .8 1.5-.9.4-2.1Z"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-md border border-line bg-surface shadow-pop">
+          <p className="border-b border-line px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Configurações</p>
+          <form action={logout}>
+            <button
+              type="submit"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-ink-soft hover:bg-sunken hover:text-removed"
+            >
+              <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12.5 13.5 16 10l-3.5-3.5M16 10H8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Sair da conta
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProfileMenu({ name, email, role }: { name: string; email: string; role: "ADMIN" | "USUARIO" }) {
+  const { open, setOpen, ref } = useMenu();
+  const initial = name.trim().charAt(0).toUpperCase() || "?";
+  const firstName = name.trim().split(/\s+/)[0];
 
   return (
     <div ref={ref} className="relative">
