@@ -9,7 +9,9 @@ import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { getAnalyzer } from "@/lib/engine";
 import { applyOperations } from "@/lib/engine/apply";
 import { validateChange } from "@/lib/engine/validate";
-import type { ChangeAnalysis } from "@/lib/engine/types";
+import { checkRules, decisionOperations } from "@/lib/engine/rulecheck";
+import { looksLikeClaudeAnswer } from "@/lib/claude/answer";
+import type { ChangeAnalysis, RuleDecision } from "@/lib/engine/types";
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -24,7 +26,10 @@ function analysisColumns(analysis: ChangeAnalysis) {
   return {
     analysis: JSON.stringify(analysis),
     affectedSections: JSON.stringify(analysis.affectedSections),
-    conflicts: JSON.stringify(analysis.conflicts.map((c) => c.description)),
+    conflicts: JSON.stringify([
+      ...analysis.conflicts.map((c) => c.description),
+      ...(analysis.ruleChecks ?? []).filter((c) => c.kind === "conflitante").map((c) => c.explanation),
+    ]),
     suggestion: analysis.suggestedRule ?? analysis.suggestion,
     impactLevel: analysis.audit || analysis.answer ? null : analysis.impact,
     status: statusFor(analysis),
@@ -40,11 +45,18 @@ function refresh(slug: string) {
   revalidatePath(`/p/${slug}`, "layout");
 }
 
+const CLAUDE_HERE = `Isto parece uma resposta do Claude (tem marcas como TROCAR, <<<, >>> ou FIM). Aqui ela seria lida como um pedido escrito e poderia mexer em linhas sem relação. Cole-a em “Corrigir com o Claude”, no campo 2 — lá cada bloco é localizado no prompt.`;
+
 /** PASSO 2–4: registra o pedido e roda a análise. Nada é alterado no prompt. */
-export async function requestChange(promptId: string, request: string): Promise<ActionResult<{ changeId: string }>> {
+export async function requestChange(
+  promptId: string,
+  request: string
+): Promise<ActionResult<{ changeId: string }> | { ok: false; error: string; claudeAnswer: true }> {
   const me = await requireUser();
   const text = request.trim();
   if (!text) return { ok: false, error: "Descreva o que você deseja alterar." };
+  // Resposta do Claude colada aqui seria lida como pedido escrito e poderia mexer em linhas sem relação
+  if (looksLikeClaudeAnswer(text)) return { ok: false, error: CLAUDE_HERE, claudeAnswer: true };
   const current = await getCurrentVersion(promptId);
   if (!current) return { ok: false, error: "Este prompt ainda não tem nenhuma versão." };
 
@@ -86,6 +98,8 @@ export async function answerClarification(changeId: string, answer: string): Pro
 }
 
 const EditSchema = z.array(z.object({ id: z.string(), enabled: z.boolean(), newText: z.string() }));
+const DecisionSchema = z.array(z.object({ line: z.number().int().min(0), choice: z.enum(["alterar", "manter"]), text: z.string().max(4000) }));
+const isDecisionOp = (id: string) => id.startsWith("decisao-");
 
 /**
  * PASSO 5–8: aplica as operações aprovadas (com as edições do usuário),
@@ -94,11 +108,13 @@ const EditSchema = z.array(z.object({ id: z.string(), enabled: z.boolean(), newT
  */
 export async function applyChange(
   changeId: string,
-  edits: { id: string; enabled: boolean; newText: string }[]
+  edits: { id: string; enabled: boolean; newText: string }[],
+  decisions: { line: number; choice: "alterar" | "manter"; text: string }[] = []
 ): Promise<ActionResult<null>> {
   await requireUser();
   const parsedEdits = EditSchema.safeParse(edits);
-  if (!parsedEdits.success) return { ok: false, error: "Operações inválidas." };
+  const parsedDecisions = DecisionSchema.safeParse(decisions);
+  if (!parsedEdits.success || !parsedDecisions.success) return { ok: false, error: "Operações inválidas." };
 
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId }, include: { fromVersion: true } });
   if (!change?.fromVersion) return { ok: false, error: "Alteração não encontrada." };
@@ -116,13 +132,38 @@ export async function applyChange(
   if (!analysis) return { ok: false, error: "Análise não encontrada." };
 
   // Só aceitamos do navegador: ligar/desligar e o texto novo. Linha, tipo e texto antigo vêm da análise.
+  // Operações de decisões anteriores saem: as decisões são reenviadas e viram operações de novo.
   const byId = new Map(parsedEdits.data.map((e) => [e.id, e]));
-  const operations = analysis.operations.map((op) => {
-    const e = byId.get(op.id);
-    return e ? { ...op, enabled: e.enabled, newText: op.type === "remover_linha" ? "" : e.newText } : op;
-  });
+  const operations = analysis.operations
+    .filter((op) => !isDecisionOp(op.id))
+    .map((op) => {
+      const e = byId.get(op.id);
+      return e ? { ...op, enabled: e.enabled, newText: op.type === "remover_linha" ? "" : e.newText } : op;
+    });
 
-  const result = applyOperations(change.fromVersion.content, operations);
+  // Mesma avaliação de conflito da análise, refeita sobre o que vai ser aplicado (o texto pode ter sido editado)
+  const content = change.fromVersion.content;
+  const ruleChecks = checkRules(content, operations);
+  const conflicting = ruleChecks.filter((c) => c.kind === "conflitante");
+  const lines = content.split(/\r?\n/);
+  const ruleDecisions: RuleDecision[] = [];
+  const problems: string[] = [];
+  for (const c of conflicting) {
+    const d = parsedDecisions.data.find((x) => x.line === c.line);
+    if (!d) problems.push(`decida o que fazer com a L${c.line + 1}`);
+    else if (d.choice === "manter" && d.text.trim().length < 10) problems.push(`na L${c.line + 1}, diga em que situação vale cada regra`);
+    else if (d.choice === "alterar" && d.text.trim() === c.text.trim()) problems.push(`na L${c.line + 1}, edite o texto da regra existente (ou deixe vazio para removê-la)`);
+    else ruleDecisions.push({ ...d, text: d.text.trim(), ruleText: lines[c.line] ?? "" });
+  }
+  if (problems.length) {
+    // Guarda as edições e a avaliação atual, para a tela mostrar os conflitos sem perder o que foi editado
+    await prisma.changeRequest.update({ where: { id: changeId }, data: { analysis: JSON.stringify({ ...analysis, operations, ruleChecks }) } });
+    refresh(await slugOf(change.promptId));
+    return { ok: false, error: `Antes de aplicar: ${problems.join("; ")}.` };
+  }
+
+  const finalOperations = [...operations, ...decisionOperations(content, ruleDecisions)];
+  const result = applyOperations(content, finalOperations);
   if (result.skipped.length) {
     return { ok: false, error: result.skipped.map((s) => s.reason).join(" ") };
   }
@@ -137,7 +178,7 @@ export async function applyChange(
     where: { id: changeId },
     data: {
       status: "APLICADA",
-      analysis: JSON.stringify({ ...analysis, operations }),
+      analysis: JSON.stringify({ ...analysis, operations: finalOperations, ruleChecks, ruleDecisions }),
       proposedContent: result.content,
       validation: JSON.stringify(validation),
     },

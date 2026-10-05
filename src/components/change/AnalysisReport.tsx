@@ -1,6 +1,6 @@
 import { Card, CardBody, Eyebrow, ImpactPill, Pill } from "@/components/ui/Surfaces";
-import type { ChangeAnalysis, RuleRef } from "@/lib/engine/types";
-import { IMPACT_LABELS, KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
+import type { ChangeAnalysis, RuleCheck, RuleCheckKind, RuleDecision, RuleRef } from "@/lib/engine/types";
+import { IMPACT_LABELS, KNOWLEDGE_CATEGORIES, RULE_CHECK_LABELS } from "@/lib/engine/types";
 import Link from "next/link";
 import { UnitLogo } from "@/components/Brand";
 
@@ -36,7 +36,9 @@ export function AnalysisReport({ analysis, showSuggestion = true }: { analysis: 
           {analysis.affectedRules.length ? <RuleList rules={analysis.affectedRules} /> : <Empty>Nenhuma regra atual precisa ser modificada.</Empty>}
         </Block>
 
-        <Block title="Possíveis conflitos" tone={analysis.conflicts.length ? "warn" : "faint"}>
+        {analysis.ruleChecks && <RuleChecksBlock checks={analysis.ruleChecks} decisions={analysis.ruleDecisions ?? []} />}
+
+        <Block title={analysis.ruleChecks ? "Outros avisos" : "Possíveis conflitos"} tone={analysis.conflicts.length ? "warn" : "faint"}>
           {analysis.conflicts.length ? (
             <ul className="space-y-2">
               {analysis.conflicts.map((c, i) => (
@@ -54,7 +56,7 @@ export function AnalysisReport({ analysis, showSuggestion = true }: { analysis: 
               ))}
             </ul>
           ) : (
-            <Empty>Nenhum conflito identificado.</Empty>
+            <Empty>{analysis.ruleChecks ? "Nenhum outro aviso." : "Nenhum conflito identificado."}</Empty>
           )}
         </Block>
 
@@ -177,5 +179,88 @@ function RuleList({ rules, muted }: { rules: RuleRef[]; muted?: boolean }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+const COUNT_LABELS: Record<RuleCheckKind, [string, string]> = {
+  conflitante: ["conflitante", "conflitantes"],
+  substituida: ["substituída pela alteração", "substituídas pela alteração"],
+  dependente: ["dependente", "dependentes"],
+  compativel: ["compatível", "compatíveis"],
+};
+
+const CHECK_TONE: Record<RuleCheckKind, "warn" | "accent" | "neutral" | "added"> = {
+  conflitante: "warn",
+  substituida: "accent",
+  dependente: "neutral",
+  compativel: "added",
+};
+
+/** Avaliação de conflito (a mesma para pedido escrito e correção do Claude) e as decisões tomadas. */
+function RuleChecksBlock({ checks, decisions }: { checks: RuleCheck[]; decisions: RuleDecision[] }) {
+  const main = checks.filter((c) => c.kind !== "compativel");
+  const compatible = checks.filter((c) => c.kind === "compativel");
+  const count = (k: RuleCheckKind) => checks.filter((c) => c.kind === k).length;
+  const hasConflict = count("conflitante") > 0;
+  return (
+    <Block title="Avaliação das regras relacionadas" tone={hasConflict ? "warn" : "faint"}>
+      {!checks.length ? (
+        <Empty>Nenhuma outra regra do prompt trata do mesmo assunto da alteração.</Empty>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[12.5px] text-ink-faint">
+            {(["conflitante", "substituida", "dependente", "compativel"] as const)
+              .filter((k) => count(k) > 0)
+              .map((k) => `${count(k)} ${COUNT_LABELS[k][count(k) === 1 ? 0 : 1]}`)
+              .join(" · ")}
+          </p>
+          <ul className="space-y-2">
+            {main.map((c) => (
+              <CheckItem key={c.line} check={c} decision={decisions.find((d) => d.line === c.line)} />
+            ))}
+          </ul>
+          {compatible.length > 0 && (
+            <details className="group">
+              <summary className="cursor-pointer list-none text-[12.5px] text-ink-soft">
+                {compatible.length} {compatible.length === 1 ? "regra compatível" : "regras compatíveis"}{" "}
+                <span className="text-[11px] text-ink-faint group-open:hidden">ver</span>
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {compatible.map((c) => (
+                  <CheckItem key={c.line} check={c} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </Block>
+  );
+}
+
+function CheckItem({ check, decision }: { check: RuleCheck; decision?: RuleDecision }) {
+  return (
+    <li className={check.kind === "conflitante" ? "rounded border border-warn-border bg-warn-bg/60 px-3 py-2" : "rounded border border-line px-3 py-2"}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Pill tone={CHECK_TONE[check.kind]}>{RULE_CHECK_LABELS[check.kind]}</Pill>
+        <span className="font-mono text-[11px] text-ink-faint">L{check.line + 1}</span>
+        <span className="text-[11px] text-ink-faint">{check.section}</span>
+      </div>
+      <p className="mt-1 text-[13px] text-ink">&ldquo;{check.text.length > 260 ? `${check.text.slice(0, 259)}…` : check.text}&rdquo;</p>
+      <p className={check.kind === "conflitante" ? "mt-0.5 text-[12.5px] text-warn" : "mt-0.5 text-[12.5px] text-ink-soft"}>{check.explanation}</p>
+      {check.kind === "conflitante" &&
+        (decision ? (
+          <p className="mt-1 text-[12.5px] text-ink">
+            <span className="font-medium">Decisão:</span>{" "}
+            {decision.choice === "manter"
+              ? <>manter as duas. &ldquo;{decision.text}&rdquo;</>
+              : decision.text
+                ? <>regra existente reescrita para &ldquo;{decision.text}&rdquo;.</>
+                : "regra existente removida."}
+          </p>
+        ) : (
+          <p className="mt-1 text-[12px] text-ink-faint">Decida abaixo, em “Alteração proposta”, antes de aplicar.</p>
+        ))}
+    </li>
   );
 }

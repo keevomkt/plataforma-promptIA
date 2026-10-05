@@ -6,7 +6,7 @@
  * prompt carregado. Nenhum termo de negócio pode entrar aqui.
  * Mudou alguma lista? Suba a versão: ela é registrada em cada resultado.
  */
-export const LEXICON_VERSION = "pt-BR/3";
+export const LEXICON_VERSION = "pt-BR/4";
 
 /** Palavras da própria pergunta ou que falam sobre o prompt — nunca são o assunto. */
 export const QUESTION_META = [
@@ -98,3 +98,35 @@ export const DEFINITION_AFTER_NAME = ["é", "são", "faz parte", "fazem parte", 
 
 /** Verbos de apresentação logo antes do nome ("apresente o X", "ofereça a X"). */
 export const PRESENTING_VERBS = ["apresente", "apresentar", "ofereça", "oferecer", "indique", "indicar", "recomende", "recomendar"];
+
+// --- Obrigação × opção (avaliação de conflito das alterações, ver engine/rulecheck.ts) ---
+// Expressões já normalizadas (minúsculas, sem acento). As de opção são lidas
+// antes das de obrigação, porque várias negam uma obrigação ("não é obrigatório").
+
+/** A regra deixa algo opcional ou manda não insistir. */
+export const OPTIONAL_MARKERS = [
+  "opcional", "opcionais", "opcionalmente", "facultativo", "facultativa", "facultativos", "facultativas",
+  "se quiser", "se quiserem", "se desejar", "se desejarem", "caso queira", "caso queiram", "caso deseje", "caso desejem",
+  "nao queira", "nao queiram", "nao quiser", "nao quiserem", "nao deseje", "nao desejar", "nao desejem",
+  "se possivel", "quando possivel", "sempre que possivel",
+  "nao insista", "nao insistir", "sem insistir", "nao precisa", "nao precisam",
+  "nao e obrigatorio", "nao e obrigatoria", "nao sao obrigatorios", "nao sao obrigatorias",
+  "nao e necessario", "nao e necessaria", "nao sao necessarios", "nao sao necessarias",
+  "pode pular", "podem pular", "pode ser pulada", "pode ser pulado",
+];
+
+/** A regra torna algo obrigatório ou impede seguir sem ele. */
+export const MANDATORY_MARKERS = [
+  "obrigatorio", "obrigatoria", "obrigatorios", "obrigatorias", "obrigatoriamente",
+  "indispensavel", "indispensaveis", "imprescindivel", "imprescindiveis",
+  "necessario", "necessaria", "necessarios", "necessarias",
+  "exija", "exijam", "exigir", "insista", "insistir",
+  "pergunte novamente", "pergunte de novo", "nao avance", "nunca avance", "nao siga", "nunca siga",
+  "antes de avancar", "sem ter obtido", "sem obter",
+];
+
+/** A regra (ou a introdução da lista dela) trata a informação como algo que pode faltar. */
+export const PRESENCE_CONDITIONS = [
+  "quando tiverem sido informad", "quando tiver sido informad", "quando informad", "se informad", "se tiver sido informad",
+  "caso tenha sido informad", "caso tenham sido informad", "quando houver", "se houver", "caso haja", "quando disponive", "se disponive",
+];

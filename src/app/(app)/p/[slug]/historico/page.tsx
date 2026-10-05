@@ -5,6 +5,7 @@ import { diffStats } from "@/lib/diff";
 import { Card, CardBody, CardHeader, CurrentTag, Eyebrow, ImpactPill } from "@/components/ui/Surfaces";
 import { VersionActions } from "@/components/VersionActions";
 import { ComparePicker } from "@/components/ComparePicker";
+import { CopyToKeevo } from "@/components/CopyToKeevo";
 
 const KIND_LABELS: Record<string, string> = {
   PEDIDO: "Alteração solicitada",
@@ -21,6 +22,10 @@ export default async function HistoryPage({ params }: { params: { slug: string }
   const current = await getCurrentVersion(prompt.id);
   const versions = await listVersions(prompt.id);
   const byId = new Map(versions.map((v) => [v.id, v]));
+  // Última cópia de cada versão para a KeevoIA (a lista vem da mais recente para a mais antiga)
+  const copies = await prisma.versionCopy.findMany({ where: { version: { promptId: prompt.id } }, orderBy: { copiedAt: "desc" } });
+  const lastCopy = new Map<string, (typeof copies)[number]>();
+  for (const c of copies) if (!lastCopy.has(c.versionId)) lastCopy.set(c.versionId, c);
   const timeline = await prisma.changeRequest.findMany({
     where: { promptId: prompt.id, status: "VERSIONADA" },
     orderBy: { decidedAt: "desc" },
@@ -77,6 +82,7 @@ export default async function HistoryPage({ params }: { params: { slug: string }
                               Seções: <span className="text-ink-soft">{sections.join(" · ")}</span>
                             </p>
                           )}
+                          {c.toVersion && <KeevoStatus copy={lastCopy.get(c.toVersion.id)} />}
                           <div className="flex items-center justify-between text-[12px] text-ink-faint">
                             <span>
                               Responsável: <span className="text-ink-soft">{c.createdBy}</span> ·{" "}
@@ -131,12 +137,42 @@ export default async function HistoryPage({ params }: { params: { slug: string }
                   {formatDateTime(v.createdAt)} · {v.createdBy} · Temperatura <span className="font-mono">{v.temperature}</span> · Top P{" "}
                   <span className="font-mono">{v.topP}</span>
                 </p>
+                {isCurrent ? (
+                  <div className="pt-1.5">
+                    <CopyToKeevo
+                      versionId={v.id}
+                      version={v.version}
+                      content={v.content}
+                      isCurrent
+                      lastCopy={lastCopy.has(v.id) ? { at: formatDateTime(lastCopy.get(v.id)!.copiedAt), by: lastCopy.get(v.id)!.copiedBy } : null}
+                    />
+                  </div>
+                ) : (
+                  <KeevoStatus copy={lastCopy.get(v.id)} />
+                )}
               </CardBody>
             </Card>
           );
         })}
         <Eyebrow className="pt-2">Toda alteração aprovada gera uma nova versão; nenhuma versão é apagada.</Eyebrow>
+        <p className="text-[12px] text-ink-faint">
+          Salvar uma versão aqui não muda a IA em produção: a mudança só vale depois que o texto da versão é colado no prompt oficial da KeevoIA.
+        </p>
       </section>
     </div>
+  );
+}
+
+function KeevoStatus({ copy }: { copy?: { copiedAt: Date; copiedBy: string } }) {
+  return (
+    <p className="text-[11.5px] text-ink-faint">
+      {copy ? (
+        <>
+          <span className="text-added">✓</span> Copiada para a KeevoIA em {formatDateTime(copy.copiedAt)} por {copy.copiedBy}
+        </>
+      ) : (
+        "Não copiada para a KeevoIA"
+      )}
+    </p>
   );
 }

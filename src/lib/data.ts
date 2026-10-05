@@ -80,8 +80,12 @@ export function readStringList(raw: string): string[] {
   }
 }
 
+// Fuso fixo: no Vercel o servidor roda em UTC, e as datas apareciam 3 h adiantadas
+const TIME_ZONE = "America/Sao_Paulo";
+
 export function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -91,5 +95,5 @@ export function formatDateTime(date: Date) {
 }
 
 export function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
 }

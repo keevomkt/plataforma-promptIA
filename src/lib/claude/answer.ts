@@ -4,7 +4,7 @@
  * TEXTO — nunca pelo número de linha. O que não for localizado com
  * segurança vira aviso, não operação.
  */
-import { isRuleLine, parsePrompt, sectionLabel, type ParsedPrompt } from "@/lib/engine/parse";
+import { isRuleLine, parsePrompt, sectionLabel, type ParsedPrompt, type PromptLine } from "@/lib/engine/parse";
 import { lineWithText } from "@/lib/engine/apply";
 import type { Operation, RuleRef } from "@/lib/engine/types";
 
@@ -55,6 +55,24 @@ export function parseClaudeAnswer(text: string): { cause: string; blocks: Claude
     blocks.push({ kind, quote: trimBlock(quote), newText: trimBlock(newText) });
   }
   return { cause: cause.join("\n").replace(/^\s*\**\s*CAUSA\s*\**\s*:?\s*/i, "").trim(), blocks, problems };
+}
+
+const CAUSE = /^\s*[#*>_-]*\s*\**\s*CAUSA\b/i;
+
+/** O texto tem cara de resposta do Claude (marcas do formato de blocos)? */
+export function looksLikeClaudeAnswer(text: string): boolean {
+  return text.split(/\r?\n/).some((l) => HEADER.test(l) || OPEN.test(l) || ARROW.test(l) || END.test(l) || CAUSE.test(l));
+}
+
+/**
+ * Por que nenhum bloco foi reconhecido. Quando há marcas soltas (ex.: só o
+ * "FIM"), a resposta quase sempre perdeu as outras na cópia.
+ */
+export function unreadableReason(text: string): string {
+  if (looksLikeClaudeAnswer(text)) {
+    return "A resposta tem parte das marcas do formato (por exemplo o “FIM”), mas faltam as outras: o nome do bloco (TROCAR, INSERIR DEPOIS DE ou REMOVER) e as marcas <<< e >>>. Isso costuma acontecer quando só um trecho da resposta é copiado, ou quando a cópia sai do texto formatado do Claude. Use o botão “Copiar” do bloco de código da resposta e cole de novo.";
+  }
+  return "O texto colado não segue o formato de correção (CAUSA e blocos TROCAR / INSERIR DEPOIS DE / REMOVER). Peça ao Claude, na mesma conversa: “responda no formato de blocos pedido, dentro de um bloco de código”, e cole a nova resposta.";
 }
 
 function trimBlock(lines: string[]): string {
@@ -144,7 +162,8 @@ export function resolveBlocks(content: string, blocks: ClaudeBlock[]): ResolvedA
       const anchor = parsed.lines[m.end];
       const next = parsed.lines[m.end + 1];
       const paragraph = anchor.kind === "text" && next?.kind === "blank";
-      push({ type: "inserir_apos", line: m.end, newText: paragraph ? `\n${b.newText}` : b.newText, reason: `Inserção sugerida pelo Claude (${tag}).` });
+      const text = withMarker(anchor, newLines).join("\n");
+      push({ type: "inserir_apos", line: m.end, newText: paragraph ? `\n${text}` : text, reason: `Inserção sugerida pelo Claude (${tag}).` });
       affectedRules.push(ref(m.end));
       return;
     }
@@ -170,9 +189,8 @@ export function resolveBlocks(content: string, blocks: ClaudeBlock[]): ResolvedA
       if (!m.exact || !first.raw.includes(b.quote.trim())) return notes.push(`O trecho do ${tag} é só parte da ${L1(m.start)} e não bate letra por letra; não troquei para não errar. Peça ao Claude a linha inteira.`);
       replacement = first.raw.replace(b.quote.trim(), b.newText).split("\n");
     } else {
-      replacement = [...newLines];
-      // Citou a regra sem o marcador de lista e devolveu sem marcador: mantém o marcador original
-      if (first.marker && !LIST_MARK.test(replacement[0])) replacement[0] = lineWithText(first, replacement[0].trim());
+      // Citou a regra sem o marcador de lista e devolveu sem marcador: cada linha nova herda o marcador original
+      replacement = withMarker(first, newLines);
     }
     push({ type: "substituir_linha", line: m.start, newText: replacement[0], reason: `Troca sugerida pelo Claude (${tag}).` });
     for (const l of lines.slice(1)) push({ type: "remover_linha", line: l, newText: "", reason: `Parte do trecho trocado (${tag}).` });
@@ -182,6 +200,12 @@ export function resolveBlocks(content: string, blocks: ClaudeBlock[]): ResolvedA
   });
 
   return { operations, affectedRules, notes };
+}
+
+/** Em lista, linhas novas sem marcador recebem o marcador (e o recuo) da regra de referência. */
+function withMarker(ref: PromptLine, lines: string[]): string[] {
+  if (!ref.marker || ref.kind !== "bullet") return lines;
+  return lines.map((l) => (l.trim() && !LIST_MARK.test(l) ? lineWithText(ref, l.trim()) : l));
 }
 
 function short(s: string) {

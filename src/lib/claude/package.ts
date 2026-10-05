@@ -20,7 +20,8 @@ export type PackageInput = {
 
 export const ANSWER_FORMAT = `Comece com uma seção CAUSA explicando, em poucas linhas, por que o problema acontece (cite as linhas, ex.: L193).
 
-Depois, escreva SOMENTE as mudanças necessárias, uma por bloco, exatamente neste formato:
+Depois, escreva SOMENTE as mudanças necessárias, uma por bloco, exatamente neste formato.
+IMPORTANTE: coloque a CAUSA e todos os blocos dentro de UM ÚNICO bloco de código (entre \`\`\`), para que o botão Copiar preserve as marcas <<< e >>> letra por letra:
 
 TROCAR
 <<<

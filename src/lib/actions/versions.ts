@@ -70,3 +70,17 @@ export async function duplicateVersion(versionId: string, name: string): Promise
     sourceLabel: `duplicado de ${source.prompt.name} v${source.version}`,
   });
 }
+
+/**
+ * Registra que o texto da versão foi copiado para colar na KeevoIA. A cópia
+ * em si acontece no navegador; aqui fica só quem copiou e quando, para o
+ * histórico mostrar se a versão vigente já foi levada para a produção.
+ */
+export async function recordKeevoCopy(versionId: string): Promise<ActionResult<{ copiedAt: string }>> {
+  const user = (await requireUser()).name;
+  const version = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
+  if (!version) return { ok: false, error: "Versão não encontrada." };
+  const copy = await prisma.versionCopy.create({ data: { versionId, copiedBy: user } });
+  revalidatePath(`/p/${version.prompt.slug}`, "layout");
+  return { ok: true, data: { copiedAt: copy.copiedAt.toISOString() } };
+}

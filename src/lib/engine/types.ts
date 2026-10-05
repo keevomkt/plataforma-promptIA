@@ -89,6 +89,45 @@ export type ChangeAnalysis = {
   conversationInput?: { transcript?: string; hadImage: boolean; expectedBehavior: string };
   /** Resposta do Claude colada na plataforma, guardada como veio (correções feitas no claude.ai). */
   pastedAnswer?: string;
+  /** Avaliação das regras que tratam do mesmo assunto da alteração (ver rulecheck.ts). Análises antigas não têm. */
+  ruleChecks?: RuleCheck[];
+  /** Decisões tomadas sobre as regras conflitantes, gravadas ao aplicar. */
+  ruleDecisions?: RuleDecision[];
+};
+
+/**
+ * Como uma regra que fica no prompt se relaciona com a alteração:
+ * - conflitante: diz o contrário (ou repete) o que a alteração introduz; exige decisão;
+ * - dependente: cita o mesmo assunto e continua valendo, mas depende dele;
+ * - compativel: cita o mesmo assunto na mesma direção;
+ * - substituida: é a própria regra trocada/removida, e a alteração inverte o que ela dizia.
+ */
+export type RuleCheckKind = "conflitante" | "dependente" | "compativel" | "substituida";
+
+export type RuleCheck = {
+  kind: RuleCheckKind;
+  line: number; // 0-based
+  section: string;
+  text: string;
+  /** Assunto em comum, nas palavras do próprio prompt. */
+  topic: string;
+  explanation: string;
+};
+
+export type RuleDecision = {
+  line: number;
+  /** alterar: a regra existente ganha o texto `text` (vazio = remover). manter: as duas ficam, `text` diz em que situação vale cada uma. */
+  choice: "alterar" | "manter";
+  text: string;
+  /** Texto da regra no momento da decisão (conferido ao aplicar). */
+  ruleText: string;
+};
+
+export const RULE_CHECK_LABELS: Record<RuleCheckKind, string> = {
+  conflitante: "Conflitante",
+  dependente: "Dependente",
+  compativel: "Compatível",
+  substituida: "Substituída pela alteração",
 };
 
 export type AnswerResult = {

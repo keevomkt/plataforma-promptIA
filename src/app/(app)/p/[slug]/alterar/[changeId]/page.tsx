@@ -10,7 +10,8 @@ import {
   readValidation,
 } from "@/lib/data";
 import { Card, CardBody, Eyebrow, ImpactPill, Pill, StatusPill } from "@/components/ui/Surfaces";
-import { GovernanceSteps } from "@/components/change/GovernanceSteps";
+import { GovernanceSteps, NextStep } from "@/components/change/GovernanceSteps";
+import { CopyToKeevo } from "@/components/CopyToKeevo";
 import { AnalysisReport } from "@/components/change/AnalysisReport";
 import { ClarificationPanel } from "@/components/change/ClarificationPanel";
 import { OperationsEditor } from "@/components/change/OperationsEditor";
@@ -33,6 +34,10 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
   const isManual = change.kind === "MANUAL";
   const isDiagnosis = change.kind === "DIAGNOSTICO";
   const isClaude = change.kind === "CLAUDE";
+  const lastCopy = change.toVersionId
+    ? await prisma.versionCopy.findFirst({ where: { versionId: change.toVersionId }, orderBy: { copiedAt: "desc" } })
+    : null;
+  const isFlow = !analysis?.audit && !analysis?.answer;
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 px-6 py-6">
@@ -76,12 +81,13 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-            <GovernanceSteps status={change.status} />
+            {isFlow && <GovernanceSteps status={change.status} kind={change.kind} copied={!!lastCopy} />}
             <span className="text-[11.5px] text-ink-faint">
               {formatDateTime(change.createdAt)} · {change.createdBy}
               {change.fromVersion && ` · sobre a v${change.fromVersion.version}`}
             </span>
           </div>
+          {isFlow && !stale && <NextStep status={change.status} copied={!!lastCopy} />}
         </CardBody>
       </Card>
 
@@ -196,7 +202,13 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
 
       {/* PASSO 5: aprovação */}
       {analysis && change.status === "AGUARDANDO_APROVACAO" && !stale && (
-        <OperationsEditor key={change.analysis.length} changeId={change.id} operations={analysis.operations} />
+        <OperationsEditor
+          key={change.analysis.length}
+          changeId={change.id}
+          operations={analysis.operations}
+          checks={analysis.ruleChecks}
+          decisions={analysis.ruleDecisions}
+        />
       )}
 
       {/* PASSO 6–8: novo prompt, diff e validação */}
@@ -243,6 +255,18 @@ export default async function ChangeDetailPage({ params }: { params: { slug: str
             </Link>
           </span>
         </div>
+      )}
+
+      {/* Último passo: a mudança só vale na IA depois de colada na KeevoIA */}
+      {change.status === "VERSIONADA" && change.toVersion && (
+        <CopyToKeevo
+          variant="card"
+          versionId={change.toVersion.id}
+          version={change.toVersion.version}
+          content={change.toVersion.content}
+          isCurrent={current?.id === change.toVersion.id}
+          lastCopy={lastCopy ? { at: formatDateTime(lastCopy.copiedAt), by: lastCopy.copiedBy } : null}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader, CurrentTag } from "@/components/ui/Surfaces
 import { VersionActions } from "@/components/VersionActions";
 import { RuleDiffView } from "@/components/change/RuleDiffView";
 import { estimateTokens, formatCount } from "@/lib/tokens";
+import { CopyToKeevo } from "@/components/CopyToKeevo";
 
 export default async function VersionPage({ params }: { params: { slug: string; versionId: string } }) {
   const prompt = await getPromptBySlug(params.slug);
@@ -13,6 +14,7 @@ export default async function VersionPage({ params }: { params: { slug: string; 
   const parent = version.parentVersionId ? await prisma.promptVersion.findUnique({ where: { id: version.parentVersionId } }) : null;
   const change = await prisma.changeRequest.findFirst({ where: { toVersionId: version.id } });
   const isCurrent = current?.id === version.id;
+  const lastCopy = await prisma.versionCopy.findFirst({ where: { versionId: version.id }, orderBy: { copiedAt: "desc" } });
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-6 py-6">
@@ -35,6 +37,16 @@ export default async function VersionPage({ params }: { params: { slug: string; 
           <Meta label="Temperatura" value={String(version.temperature)} mono />
           <Meta label="Top P" value={String(version.topP)} mono />
           <Meta label="Tamanho" value={`${formatCount(version.content.length)} caracteres · ~${formatCount(estimateTokens(version.content))} tokens`} wide />
+          <div className="col-span-2 border-t border-line pt-2.5 sm:col-span-4">
+            <CopyToKeevo
+              versionId={version.id}
+              version={version.version}
+              content={version.content}
+              isCurrent={isCurrent}
+              lastCopy={lastCopy ? { at: formatDateTime(lastCopy.copiedAt), by: lastCopy.copiedBy } : null}
+            />
+            {!isCurrent && <p className="mt-1 text-[11.5px] text-warn">Esta não é a versão vigente. Copie esta só se for de propósito.</p>}
+          </div>
           {change && ["PEDIDO", "MANUAL", "DIAGNOSTICO", "CLAUDE"].includes(change.kind) && (
             <div className="col-span-2 sm:col-span-4">
               <Link href={`/p/${prompt.slug}/alterar/${change.id}`} className="text-xs font-medium text-accent hover:underline">

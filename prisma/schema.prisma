@@ -105,6 +105,7 @@ model PromptVersion {
 
   changesFrom ChangeRequest[] @relation("FromVersion")
   changesTo   ChangeRequest[] @relation("ToVersion")
+  keevoCopies VersionCopy[]
 
   @@unique([promptId, version])
 }
@@ -114,6 +115,19 @@ model PromptVersion {
 // para a análise e a validação das alterações de prompt (não é enviada a
 // nenhum modelo). Substituir o arquivo cria uma nova revisão; nada se perde.
 // KnowledgeDocument.category: PRODUTOS | EMPRESA | TERMOS | COMERCIAL | PROCESSOS | OUTROS
+// Registro de cada vez que o texto de uma versão foi copiado para colar na
+// KeevoIA (onde o prompt roda de verdade). Salvar uma versão aqui não muda a
+// IA em produção: a cópia é o passo manual que leva a mudança até lá.
+model VersionCopy {
+  id        String        @id @default(cuid())
+  versionId String
+  version   PromptVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  copiedBy  String
+  copiedAt  DateTime      @default(now())
+
+  @@index([versionId, copiedAt])
+}
+
 model KnowledgeDocument {
   id           String   @id @default(cuid())
   title        String

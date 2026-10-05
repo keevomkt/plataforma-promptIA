@@ -24,6 +24,7 @@ import { conceptOf, ensurePeriod, normalize, polarity, stems, truncate } from ".
 import { findUnsourcedNames, KnowledgeIndex, type KnowledgeSource } from "./knowledge";
 import { computeImpact, computeInsertion, preserved } from "./shared";
 import { auditPrompt, isGenericStem } from "./audit";
+import { checkRules, withoutChecked } from "./rulecheck";
 
 export const LOCAL_ENGINE = "motor-local-v1";
 
@@ -103,6 +104,8 @@ export function analyzeChange(
   }
 
   const { impact, impactReason } = computeImpact(draft, affectedSections);
+  // Mesma avaliação de conflito de toda alteração (rulecheck.ts); o que ela classificou sai de "Possíveis conflitos"
+  const ruleChecks = checkRules(content, draft.operations);
 
   return {
     engine: LOCAL_ENGINE,
@@ -115,7 +118,7 @@ export function analyzeChange(
     preservedRules,
     preservedSections,
     relatedRules: draft.relatedRules,
-    conflicts: draft.conflicts,
+    conflicts: withoutChecked(draft.conflicts, ruleChecks),
     suggestion: draft.suggestion,
     suggestionBullets: draft.suggestionBullets,
     suggestedRule: draft.suggestedRule,
@@ -126,6 +129,7 @@ export function analyzeChange(
     notes: draft.notes,
     knowledgeRefs,
     knowledgeDocuments: knowledge.length,
+    ruleChecks,
   };
 }
 

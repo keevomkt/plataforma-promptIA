@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Form";
 import { Card, CardBody, CardHeader } from "@/components/ui/Surfaces";
 import { requestChange } from "@/lib/actions/changes";
+import { CLAUDE_ANSWER_EVENT } from "@/components/ClaudeAssist";
 
 const EXAMPLES = [
   "Existe algum vídeo de divulgação do produto no prompt?",
@@ -22,15 +23,26 @@ export function ChangeRequestForm({ promptId, slug, initial }: { promptId: strin
   const router = useRouter();
   const [request, setRequest] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const [claudeAnswer, setClaudeAnswer] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function submit() {
     setError(null);
+    setClaudeAnswer(false);
     startTransition(async () => {
       const result = await requestChange(promptId, request);
-      if (result.ok) router.push(`/p/${slug}/alterar/${result.data.changeId}`);
-      else setError(result.error);
+      if (result.ok) return router.push(`/p/${slug}/alterar/${result.data.changeId}`);
+      setError(result.error);
+      setClaudeAnswer("claudeAnswer" in result);
     });
+  }
+
+  // Leva o texto para o campo 2 de "Corrigir com o Claude", na mesma página
+  function moveToClaude() {
+    window.dispatchEvent(new CustomEvent(CLAUDE_ANSWER_EVENT, { detail: request }));
+    setRequest("");
+    setError(null);
+    setClaudeAnswer(false);
   }
 
   return (
@@ -61,7 +73,15 @@ export function ChangeRequestForm({ promptId, slug, initial }: { promptId: strin
             </button>
           ))}
         </div>
-        {error && <p className="text-xs text-removed">{error}</p>}
+        {error && !claudeAnswer && <p className="text-xs text-removed">{error}</p>}
+        {error && claudeAnswer && (
+          <div className="space-y-2 rounded border border-warn-border bg-warn-bg/60 px-3 py-2.5">
+            <p className="text-[13px] text-warn">{error}</p>
+            <Button variant="secondary" size="sm" onClick={moveToClaude}>
+              Levar para “Corrigir com o Claude”
+            </Button>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-ink-faint">Nada é alterado agora: primeiro a plataforma mostra a análise para você aprovar.</p>
           <Button variant="primary" onClick={submit} disabled={isPending || !request.trim()}>

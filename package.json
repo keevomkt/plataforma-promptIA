@@ -9,6 +9,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:locate": "tsx scripts/regression/run-locate.ts",
+    "test:changes": "tsx scripts/regression/run-changes.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
