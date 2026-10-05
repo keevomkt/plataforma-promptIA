@@ -59,8 +59,7 @@ export default async function AskPage({ params, searchParams }: { params: { slug
           <div>
             <Eyebrow>Perguntar ao prompt</Eyebrow>
             <p className="mt-1 text-[13px] text-ink-soft">
-              Tire dúvidas sobre o que o prompt e a base de conhecimento já dizem. Nada é alterado: aqui só aparecem trechos que existem no prompt
-              (v{current.version}) ou nos documentos da base.
+              Tire dúvidas sobre o que o prompt e a base de conhecimento já dizem. Nada é alterado.
             </p>
           </div>
           <AskForm key={q} promptId={prompt.id} initial={q} suggestions={suggestions} />

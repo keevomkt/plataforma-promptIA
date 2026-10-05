@@ -142,7 +142,8 @@ function RuleRow({ rule }: { rule: LocatedRule }) {
       <div className="min-w-0">
         <p className="whitespace-pre-wrap leading-relaxed text-ink">{rule.text}</p>
         <div className="mt-0.5 flex flex-wrap gap-1">
-          {rule.reasons.map((r, i) => (
+          {/* "na seção X" repete o título do grupo: não é mostrado */}
+          {rule.reasons.filter((r) => r.kind !== "secao").map((r, i) => (
             <span key={i} className="rounded-sm bg-sunken px-1.5 py-px text-[10.5px] text-ink-faint">
               {reasonLabel(r)}
             </span>

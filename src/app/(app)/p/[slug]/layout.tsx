@@ -1,9 +1,8 @@
-import { getCurrentVersion, getPromptBySlug, formatDateTime } from "@/lib/data";
+import { getCurrentVersion, getPromptBySlug } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { resolveUnit } from "@/lib/brand";
 import { PromptTabs } from "@/components/PromptTabs";
 import { UnitLogo } from "@/components/Brand";
-import { UnitPicker } from "@/components/UnitPicker";
 
 export default async function PromptLayout({ children, params }: { children: React.ReactNode; params: { slug: string } }) {
   const prompt = await getPromptBySlug(params.slug);
@@ -32,25 +31,9 @@ export default async function PromptLayout({ children, params }: { children: Rea
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink-faint">
-                <UnitPicker promptId={prompt.id} value={unit?.id ?? null} />
-                {prompt.description && <span>· {prompt.description}</span>}
-              </div>
+              {prompt.description && <p className="truncate text-xs text-ink-faint">{prompt.description}</p>}
             </div>
           </div>
-          {current && (
-            <div className="flex gap-4 text-xs text-ink-faint">
-              <span>
-                Temperatura <span className="font-mono text-ink-soft">{current.temperature}</span>
-              </span>
-              <span>
-                Top P <span className="font-mono text-ink-soft">{current.topP}</span>
-              </span>
-              <span>
-                Atualizado em {formatDateTime(current.createdAt)} por {current.createdBy}
-              </span>
-            </div>
-          )}
         </div>
         <PromptTabs slug={prompt.slug} openChanges={open} />
       </header>

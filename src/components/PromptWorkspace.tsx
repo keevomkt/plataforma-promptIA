@@ -16,6 +16,8 @@ import { submitManualEdit, updateParams } from "@/lib/actions/prompts";
 import { parsePrompt, structureSummary, visibleSections, type LineKind } from "@/lib/engine/parse";
 import { splitSentences } from "@/lib/engine/text";
 import { countWords, estimateTokens, formatCount } from "@/lib/tokens";
+import { UnitPicker } from "@/components/UnitPicker";
+import type { BusinessUnitId } from "@/lib/brand";
 
 const KIND_LABELS: Record<LineKind, string> = {
   heading: "Título de seção",
@@ -37,6 +39,7 @@ export function PromptWorkspace(props: {
   content: string;
   temperature: number;
   topP: number;
+  unit: BusinessUnitId | null;
 }) {
   const router = useRouter();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
@@ -298,7 +301,7 @@ export function PromptWorkspace(props: {
   );
 }
 
-function ParamsCard(props: { promptId: string; versionId: string; versionNumber: number; temperature: number; topP: number }) {
+function ParamsCard(props: { promptId: string; versionId: string; versionNumber: number; temperature: number; topP: number; unit: BusinessUnitId | null }) {
   const router = useRouter();
   const [temperature, setTemperature] = useState(String(props.temperature));
   const [topP, setTopP] = useState(String(props.topP));
@@ -325,6 +328,10 @@ function ParamsCard(props: { promptId: string; versionId: string; versionNumber:
         <span className="text-sm font-medium text-ink">Configuração do agente</span>
       </CardHeader>
       <CardBody className="space-y-3">
+        <div className="flex items-center justify-between gap-2 text-[12px]">
+          <span className="text-ink-faint">Unidade de negócio</span>
+          <UnitPicker promptId={props.promptId} value={props.unit} />
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="text-[12px] text-ink-faint">Temperatura</span>

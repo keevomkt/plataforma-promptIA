@@ -104,10 +104,13 @@ export function AnalysisReport({ analysis, showSuggestion = true }: { analysis: 
         <Block title="Regras que serão preservadas" tone="added">
           {analysis.preservedRules.length > 0 && <RuleList rules={analysis.preservedRules} muted />}
           {analysis.preservedSections.length > 0 && (
-            <p className="mt-2 text-[13px] text-ink-soft">
-              <span className="text-added">✓</span> {analysis.preservedSections.length} seções não são tocadas:{" "}
-              <span className="text-ink-faint">{analysis.preservedSections.join(" · ")}</span>
-            </p>
+            <details className="group mt-2 text-[13px] text-ink-soft">
+              <summary className="cursor-pointer list-none">
+                <span className="text-added">✓</span> {analysis.preservedSections.length} seções não são tocadas{" "}
+                <span className="text-[11px] text-ink-faint group-open:hidden">ver quais</span>
+              </summary>
+              <p className="mt-1 text-ink-faint">{analysis.preservedSections.join(" · ")}</p>
+            </details>
           )}
           {!analysis.preservedRules.length && !analysis.preservedSections.length && <Empty>—</Empty>}
         </Block>

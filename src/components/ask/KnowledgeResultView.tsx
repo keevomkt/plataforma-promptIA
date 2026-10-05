@@ -12,7 +12,7 @@ export function KnowledgeResultView({ answer, label }: { answer: KnowledgeAnswer
           <Eyebrow>{label}</Eyebrow>
           <p className="text-[12.5px] text-ink-faint">
             {answer.docs.length} de {answer.consulted} documento(s) consultados ({answer.scope}){" "}
-            {answer.items ? "citam algum destes itens" : <>citam &ldquo;{answer.topic}&rdquo;</>}. Trechos copiados dos documentos.
+            {answer.items ? "citam algum destes itens" : <>citam &ldquo;{answer.topic}&rdquo;</>}.
           </p>
         </div>
         {!!answer.interpretation?.length && (

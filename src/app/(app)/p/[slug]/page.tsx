@@ -1,5 +1,6 @@
 import { getCurrentVersion, getPromptBySlug } from "@/lib/data";
 import { PromptWorkspace } from "@/components/PromptWorkspace";
+import { resolveUnit } from "@/lib/brand";
 
 export default async function PromptPage({ params }: { params: { slug: string } }) {
   const prompt = await getPromptBySlug(params.slug);
@@ -17,6 +18,7 @@ export default async function PromptPage({ params }: { params: { slug: string } 
       content={version.content}
       temperature={version.temperature}
       topP={version.topP}
+      unit={resolveUnit(prompt.businessUnit)?.id ?? null}
     />
   );
 }
