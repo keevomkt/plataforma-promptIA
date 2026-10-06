@@ -130,6 +130,7 @@ export function extractNamedItems(parsed: ParsedPrompt, question: string): FactR
       lines,
       headingLine: c.section?.headingLine,
       context: contextFor(parsed, c, lines),
+      listHead: c.listItem?.head,
     });
   }
 

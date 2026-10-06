@@ -24,7 +24,7 @@ import {
   QUESTION_META,
   SOURCE_NOUNS,
 } from "./lexicon";
-import type { AskAnswer } from "./types";
+import type { AskAnswer, CategoryItem } from "./types";
 
 const META_STEMS = new Set(QUESTION_META.map(stem));
 
@@ -72,14 +72,22 @@ export function answerQuestion(
     const asksDocs = kind === "DOCUMENTOS" || !!classification.sourceSelected;
     const category = asksDocs && !topic.phrases.length ? categoryOf(parsed, corpus, topic) : undefined;
     if (category) {
-      interpretation.push(`“${category.words.join(" ou ")}” entendido como os itens que o prompt nomeia: ${category.items.join(", ")}.`);
+      const main = category.main.map((i) => i.name);
+      interpretation.push(
+        `“${category.words.join(" ou ")}” entendido como os itens que o prompt nomeia (${category.via.join("; ")}): ${main.join(", ")}.`
+      );
+      // Uma busca só, com todos os itens; cada documento vai para o grupo do item que ele cita
+      const all = index.findForQuestion({ phrases: [...main, ...category.other.map((i) => i.name)], words: [] }, { minScore: 0, focus: main });
+      const mainSet = new Set(main);
       answer.knowledge = {
-        topic: category.items.join(", "),
-        items: category.items,
+        topic: main.join(", "),
+        items: main,
+        itemGroups: { main: category.main, other: category.other },
         interpretation,
         consulted: kb.sources.length,
         scope: kb.scope,
-        docs: index.findForQuestion({ phrases: category.items, words: [] }, { minScore: 0 }),
+        docs: all.filter((d) => d.matched.some((m) => mainSet.has(m))),
+        otherDocs: all.filter((d) => !d.matched.some((m) => mainSet.has(m))),
       };
       answer.consulted.base = true;
     } else if (topic.phrases.length || topic.words.length) {
@@ -112,17 +120,52 @@ function withoutWords(text: string, words: Set<string>): string {
 }
 
 /**
- * Tipos com que as fontes chamam os itens nomeados do prompt, tirados das
- * próprias frases: "o X é uma solução", "o produto X", "X: Solução para…".
- * Devolve os itens se alguma palavra da pergunta for um desses tipos.
+ * Categoria citada na pergunta ("produtos", "soluções") → itens nomeados no prompt.
+ *
+ * Os tipos com que as fontes chamam os itens vêm do próprio texto:
+ * - frases: "o X é uma solução", "o produto X", "X: Solução para…";
+ * - estrutura: o título da seção que reúne as seções próprias dos itens
+ *   ("Produtos" › NG Folha, eKeep…) e a introdução da lista com ":" em que
+ *   eles aparecem ("…nas seguintes soluções:").
+ *
+ * Grupos: os itens do prompt (seção própria, ou a mesma lista desses itens)
+ * e os também citados, cada um com a confiança da extração. Sem itens com
+ * seção própria, os citados de alta confiança fazem o papel de principais.
  */
-function categoryOf(parsed: ParsedPrompt, corpus: string[], topic: QuestionTopic): { words: string[]; items: string[] } | undefined {
+function categoryOf(
+  parsed: ParsedPrompt,
+  corpus: string[],
+  topic: QuestionTopic
+): { words: string[]; main: CategoryItem[]; other: CategoryItem[]; via: string[] } | undefined {
   if (!topic.words.length) return undefined;
   const named = extractNamedItems(parsed, "");
-  const items = (named.withSection.length ? named.withSection : named.cited.filter((i) => i.confidence === "alta")).map((i) => i.name);
-  if (!items.length) return undefined;
-  const types = new Set<string>();
-  for (const name of items) {
+  const sectioned = named.withSection;
+  const heads = new Set(sectioned.flatMap((i) => (i.listHead !== undefined ? [i.listHead] : [])));
+  const mainItems = sectioned.length
+    ? [...sectioned, ...named.cited.filter((i) => i.listHead !== undefined && heads.has(i.listHead))]
+    : named.cited.filter((i) => i.confidence === "alta");
+  if (!mainItems.length) return undefined;
+  const mainNames = new Set(mainItems.map((i) => i.name));
+
+  const types = new Map<string, string>(); // radical → de onde veio (para a tela)
+  const add = (word: string | undefined, via: string) => {
+    const [st] = word ? stems(word) : [];
+    if (st && !types.has(st)) types.set(st, via);
+  };
+
+  // Estrutura: título da seção-mãe das seções próprias e introdução da lista em comum
+  for (const item of sectioned) {
+    const own = parsed.sections.find((x) => x.headingLine === item.headingLine && x.id !== 0);
+    const parent = own?.parentId ? parsed.sections[own.parentId] : undefined;
+    if (parent && parent.id !== 0) for (const w of parent.title.match(/[\p{L}]+/gu) ?? []) add(w, `pela seção “${parent.title}”`);
+  }
+  for (const head of Array.from(heads)) {
+    const intro = parsed.lines[head]?.text ?? "";
+    const noun = intro.replace(/:\s*$/, "").match(/([\p{L}]+)\s*$/u)?.[1];
+    add(noun, `pela lista “${truncateText(intro, 60)}”`);
+  }
+  // Frases das fontes
+  for (const name of Array.from(mainNames)) {
     for (const text of corpus) {
       for (const m of Array.from(text.matchAll(spellingPattern(name)))) {
         const before = text.slice(Math.max(0, m.index! - 40), m.index!);
@@ -132,15 +175,25 @@ function categoryOf(parsed: ParsedPrompt, corpus: string[], topic: QuestionTopic
           after.match(/^\s+(?:é|são)\s+(?:o|a|um|uma)\s+([\p{L}]+)/iu)?.[1], // "X é uma solução"
           after.match(/^\**\s*:\**\s*([\p{L}]+)/u)?.[1], // "X: Solução para…"
         ];
-        for (const n of nouns) {
-          const [s] = n ? stems(n) : [];
-          if (s) types.add(s);
-        }
+        for (const n of nouns) add(n, "pelo jeito como o texto se refere a eles");
       }
     }
   }
-  const words = topic.words.filter((w) => types.has(w.stem)).map((w) => w.word);
-  return words.length ? { words, items } : undefined;
+
+  const hit = topic.words.filter((w) => types.has(w.stem));
+  if (!hit.length) return undefined;
+  const asItem = (i: { name: string; confidence: "alta" | "baixa" }): CategoryItem => ({ name: i.name, confidence: i.confidence });
+  return {
+    words: hit.map((w) => w.word),
+    via: Array.from(new Set(hit.map((w) => types.get(w.stem)!))),
+    main: mainItems.map(asItem),
+    other: [...sectioned, ...named.cited].filter((i) => !mainNames.has(i.name)).map(asItem),
+  };
+}
+
+function truncateText(s: string, max: number) {
+  const t = s.trim();
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
 }
 
 /** Artigos e contrações que, antes de um substantivo, marcam "o produto X", "da solução X". */

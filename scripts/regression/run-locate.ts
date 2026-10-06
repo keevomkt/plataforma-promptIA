@@ -120,6 +120,16 @@ function checkAnswer(c: AnswerCase, r: AskAnswer): string[] {
   const forms = new Set(docs.flatMap((d) => Object.keys(d.forms)));
   for (const f of c.formsInclude ?? []) if (!forms.has(f)) fails.push(`grafia “${f}” não foi mostrada`);
   if (c.noKnowledgeSection && docs.length) fails.push(`a base não deveria aparecer, mas trouxe: ${titles.join(", ")}`);
+  for (const want of c.categoryOtherIncludes ?? []) {
+    const got = (r.knowledge?.itemGroups?.other ?? []).map((i) => `${i.name}:${i.confidence}`);
+    if (!got.includes(want)) fails.push(`“também citados” deveria ter ${want}; veio ${got.join(", ") || "nada"}`);
+  }
+  for (const [doc, want] of Object.entries(c.countsInclude ?? {})) {
+    const d = docs.find((x) => x.title === doc);
+    for (const [item, n] of Object.entries(want)) {
+      if (d?.counts[item] !== n) fails.push(`${doc}: ${item} deveria ter ${n} ocorrência(s), veio ${d?.counts[item] ?? 0}`);
+    }
+  }
   if (c.categoryItems) {
     const exp = [...c.categoryItems].sort().join(" | ");
     const got = [...(r.knowledge?.items ?? [])].sort().join(" | ");

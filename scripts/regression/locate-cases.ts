@@ -170,6 +170,10 @@ export type AnswerCase = {
   categoryItems?: string[];
   /** Busca literal: não pode virar consulta por categoria. */
   noCategory?: boolean;
+  /** Grupo "também citados" precisa ter estes itens, com a confiança ("DP:baixa"). */
+  categoryOtherIncludes?: string[];
+  /** Ocorrências por item em cada documento ({ "NG Folha IA PM": { "NG Folha": 12 } }). */
+  countsInclude?: Record<string, Record<string, number>>;
 };
 
 export const ANSWER_CASES: AnswerCase[] = [
@@ -278,6 +282,37 @@ export const ANSWER_CASES: AnswerCase[] = [
     expectKind: "DOCUMENTOS",
     categoryItems: ["Alpha Core", "Alpha Emissor"],
     docsExactly: ["Quebra de Objeções Alpha", "Keevo Institucional", "Keevo Institucional - ERP", "Alpha Emissor", "Alpha Core"],
+    // Produtos de outras unidades e siglas genéricas ficam no grupo à parte, com a confiança
+    categoryOtherIncludes: ["NG Folha:alta", "DP:baixa"],
+  },
+  {
+    // Relatado pelo usuário (06/10): só 2 de 6 documentos; a busca procurava a palavra "produtos".
+    // O HCM não escreve "o produto X", mas reúne os itens na seção "Produtos".
+    id: "K15-hcm-categoria-pela-secao-mae",
+    prompt: "hcm",
+    question: "quais as bases de conhecimento que mencionam produtos",
+    expectKind: "DOCUMENTOS",
+    categoryItems: ["NG Folha", "eKeep", "NG Ponto", "Keevo People", "KeeX"],
+    docsIncludes: ["NG Folha IA PM"], // cita o NG Folha e nunca usa a palavra "produto"
+    countsInclude: { "NG Folha IA PM": { "NG Folha": 12 } },
+    categoryOtherIncludes: ["Departamento Pessoal:baixa"],
+  },
+  {
+    // A mesma categoria pela introdução da lista ("…nas seguintes soluções:"), que também traz o KeeX
+    id: "K16-hcm-categoria-pela-lista",
+    prompt: "hcm",
+    question: "quais bases falam das soluções?",
+    expectKind: "DOCUMENTOS",
+    categoryItems: ["NG Folha", "eKeep", "NG Ponto", "Keevo People", "KeeX"],
+  },
+  {
+    // Proximidade: palavras na mesma frase continuam achando o documento
+    id: "K17-hcm-proximidade-mesma-frase",
+    prompt: "hcm",
+    question: "quais bases falam de folha de pagamento?",
+    expectKind: "DOCUMENTOS",
+    noCategory: true,
+    docsIncludes: ["NG Folha IA PM", "Keevo People"],
   },
   {
     // Controle: palavra comum que existe nos documentos continua busca literal

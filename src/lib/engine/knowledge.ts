@@ -154,8 +154,21 @@ export class KnowledgeIndex {
    * Termo raro entre os documentos pesa mais. Termo da pergunta que nenhum
    * documento tem continua contando no total: a base só "responde" se cobre
    * o que distingue a pergunta, não só palavras comuns.
+   *
+   * Assunto só de palavras (sem nome), com duas ou mais: elas precisam
+   * aparecer perto umas das outras — na mesma frase ou a poucas palavras de
+   * distância. "preferência" num parágrafo e "contato" em outro não é
+   * "preferência de contato"; "preferência do lead para o contato" é.
    */
-  findForQuestion(topic: QuestionTopic, opts: { minScore?: number; maxExcerpts?: number } = {}): KnowledgeDocHit[] {
+  findForQuestion(
+    topic: QuestionTopic,
+    opts: {
+      minScore?: number;
+      maxExcerpts?: number;
+      /** Termos que importam mais: os trechos mostrados saem deles quando o documento os tem. */
+      focus?: string[];
+    } = {}
+  ): KnowledgeDocHit[] {
     const minScore = opts.minScore ?? 0.5;
     const maxExcerpts = opts.maxExcerpts ?? 3;
     const matchers = [
@@ -164,6 +177,13 @@ export class KnowledgeIndex {
       ...topic.words.map((w) => ({ label: w.word, phrase: false, stem: w.stem })),
     ];
     if (!matchers.length || !this.sources.length) return [];
+    const wordOnly = !topic.phrases.length && topic.words.length >= 2;
+    const focus = new Set(opts.focus ?? []);
+    const focused = (hits: Hit[]) => {
+      const own = hits.filter((h) => focus.has(matchers[h.matcher].label));
+      return own.length ? own : hits;
+    };
+    const neededNearby = topic.words.length <= 3 ? topic.words.length : Math.ceil(topic.words.length * 0.67);
 
     const perDoc = this.sources.map((source) => {
       const hits: Hit[] = [];
@@ -176,7 +196,7 @@ export class KnowledgeIndex {
           }
         }
       });
-      return { source, hits };
+      return { source, hits: wordOnly ? nearbyHits(source.content, hits, neededNearby) : hits };
     });
 
     const n = this.sources.length;
@@ -194,14 +214,25 @@ export class KnowledgeIndex {
       const counted = hits.filter((h) => (phraseIdx.length ? matchers[h.matcher].phrase : true));
       const forms: Record<string, number> = {};
       for (const h of counted) forms[h.form] = (forms[h.form] ?? 0) + 1;
+      const counts: Record<string, number> = {};
+      for (const k of Array.from(new Set(counted.map((h) => h.matcher))).sort((a, b) => a - b)) {
+        counts[matchers[k].label] = counted.filter((h) => h.matcher === k).length;
+      }
+      const itemForms: Record<string, string[]> = {};
+      for (const label of Object.keys(counts)) {
+        const k = matchers.findIndex((m) => m.label === label);
+        itemForms[label] = Array.from(new Set(counted.filter((h) => h.matcher === k).map((h) => h.form)));
+      }
       out.push({
         documentId: source.documentId,
         title: source.title,
         businessUnit: source.businessUnit,
         occurrences: counted.length,
         forms,
+        counts,
+        itemForms,
         matched: Array.from(present).map((k) => matchers[k].label),
-        excerpts: excerptsFor(source.content, hits, maxExcerpts),
+        excerpts: excerptsFor(source.content, focused(hits), maxExcerpts),
         score: Math.round(score * 100) / 100,
       });
     }
@@ -217,12 +248,40 @@ export class KnowledgeIndex {
 }
 
 const MAX_EXCERPT = 320;
+/** "Perto": na mesma frase, ou a até tantas palavras de distância (frases quebradas por lista, tabela...). */
+const NEARBY_WORDS = 8;
 
 /**
- * Frases literais do documento onde o assunto aparece: as que reúnem mais
- * termos da pergunta primeiro, mostradas na ordem do documento.
+ * Só as ocorrências que aparecem perto de outras palavras da pergunta: ao
+ * menos `needed` palavras diferentes na mesma frase ou a até NEARBY_WORDS
+ * palavras de distância. Palavras soltas em pontos distantes não contam.
  */
-function excerptsFor(content: string, hits: Hit[], max: number): KnowledgeExcerpt[] {
+function nearbyHits(content: string, hits: Hit[], needed: number): Hit[] {
+  if (hits.length < needed) return [];
+  const tokenStarts = Array.from(content.matchAll(/[\p{L}\p{N}]+/gu)).map((m) => m.index!);
+  const tokenAt = (pos: number) => {
+    let lo = 0;
+    let hi = tokenStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (tokenStarts[mid] <= pos) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const sentences = sentenceSpans(content);
+  const sentenceAt = (pos: number) => sentences.findIndex((s) => pos >= s.start && pos < s.end);
+  const info = hits.map((h) => ({ h, token: tokenAt(h.start), sentence: sentenceAt(h.start) }));
+  const keep = new Set<Hit>();
+  for (const a of info) {
+    const near = info.filter((b) => (a.sentence >= 0 && b.sentence === a.sentence) || Math.abs(b.token - a.token) <= NEARBY_WORDS);
+    if (new Set(near.map((b) => b.h.matcher)).size >= needed) near.forEach((b) => keep.add(b.h));
+  }
+  return hits.filter((h) => keep.has(h));
+}
+
+/** Frases do documento com a posição de cada uma no texto. */
+function sentenceSpans(content: string): { start: number; end: number; text: string }[] {
   const sentences: { start: number; end: number; text: string }[] = [];
   let offset = 0;
   for (const line of content.split("\n")) {
@@ -234,6 +293,15 @@ function excerptsFor(content: string, hits: Hit[], max: number): KnowledgeExcerp
     }
     offset += line.length + 1;
   }
+  return sentences;
+}
+
+/**
+ * Frases literais do documento onde o assunto aparece: as que reúnem mais
+ * termos da pergunta primeiro, mostradas na ordem do documento.
+ */
+function excerptsFor(content: string, hits: Hit[], max: number): KnowledgeExcerpt[] {
+  const sentences = sentenceSpans(content);
   const scored = sentences
     .map((s, i) => {
       const inside = hits.filter((h) => h.start >= s.start && h.end <= s.end);

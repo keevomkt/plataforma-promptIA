@@ -85,6 +85,10 @@ export type KnowledgeDocHit = {
   occurrences: number;
   /** Grafias encontradas e quantas vezes cada uma ("NGEssence": 18). */
   forms: Record<string, number>;
+  /** Ocorrências por termo buscado ("NG Folha": 2), na ordem da busca. */
+  counts: Record<string, number>;
+  /** Grafias encontradas de cada termo buscado ("NG Essence": ["NGEssence"]). */
+  itemForms: Record<string, string[]>;
   /** Palavras da pergunta encontradas no documento. */
   matched: string[];
   excerpts: KnowledgeExcerpt[];
@@ -95,6 +99,13 @@ export type KnowledgeAnswer = {
   topic: string;
   /** A pergunta citou uma categoria ("produtos"): a base foi consultada por estes itens nomeados no prompt. */
   items?: string[];
+  /**
+   * Itens da categoria em dois grupos: os do prompt (seção própria ou a mesma lista
+   * deles) e os também citados, cada um com a confiança da extração.
+   */
+  itemGroups?: { main: CategoryItem[]; other: CategoryItem[] };
+  /** Documentos que só citam itens do grupo "também citados" (mostrados à parte). */
+  otherDocs?: KnowledgeDocHit[];
   /** Como a pergunta foi entendida, em texto para a tela (categoria, unidade do prompt...). */
   interpretation?: string[];
   /** Quantos documentos foram consultados (unidade + gerais). */
@@ -102,6 +113,8 @@ export type KnowledgeAnswer = {
   scope: string;
   docs: KnowledgeDocHit[];
 };
+
+export type CategoryItem = { name: string; confidence: "alta" | "baixa" };
 
 /** Resposta completa da aba: cada bloco com a sua fonte, nunca misturados. */
 export type AskAnswer = {
@@ -133,6 +146,8 @@ export type NamedItem = {
   headingLine?: number;
   /** Trecho literal do prompt que dá contexto ao item. */
   context?: { line: number; text: string; intro?: { line: number; text: string } };
+  /** Linha que introduz a lista com ":" da qual o item faz parte, se fizer. */
+  listHead?: number;
 };
 
 export type FactResult = {
