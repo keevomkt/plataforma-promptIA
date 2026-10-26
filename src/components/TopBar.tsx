@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import clsx from "clsx";
 import { UnitLogo } from "@/components/Brand";
 import { EditPromptDialog } from "@/components/EditPromptDialog";
 import { logout } from "@/lib/actions/auth";
@@ -14,13 +15,26 @@ const iconButton =
 type PromptTitle = { id: string; slug: string; name: string; description: string | null; unit: string | null; version: number | null };
 
 /** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema, configurações e perfil à direita. */
-export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: Role; prompts: PromptTitle[] }) {
+export function TopBar({
+  name,
+  email,
+  role,
+  prompts,
+  pendingUsers,
+}: {
+  name: string;
+  email: string;
+  role: Role;
+  prompts: PromptTitle[];
+  /** Cadastros aguardando aprovação (só contado para administradores). */
+  pendingUsers: number;
+}) {
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/80 px-6 backdrop-blur">
       <CurrentPrompt prompts={prompts} canEdit={role === "ADMIN"} />
       <div className="flex shrink-0 items-center gap-2">
         <ThemeToggle />
-        <SettingsMenu />
+        <SettingsMenu isAdmin={role === "ADMIN"} pendingUsers={pendingUsers} />
         <ProfileMenu name={name} email={email} role={role} />
       </div>
     </div>
@@ -106,9 +120,10 @@ function useMenu() {
   return { open, setOpen, ref };
 }
 
-/** Configurações. Por enquanto, só sair da conta. */
-function SettingsMenu() {
+/** Configurações: administração de usuários (só administradores) e sair da conta. */
+function SettingsMenu({ isAdmin, pendingUsers }: { isAdmin: boolean; pendingUsers: number }) {
   const { open, setOpen, ref } = useMenu();
+  const pathname = usePathname();
   return (
     <div ref={ref} className="relative">
       <button
@@ -116,10 +131,15 @@ function SettingsMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={iconButton}
-        title="Configurações"
+        className={clsx(iconButton, "relative")}
+        title={pendingUsers ? `Configurações · ${pendingUsers} cadastro(s) aguardando aprovação` : "Configurações"}
         aria-label="Configurações"
       >
+        {pendingUsers > 0 && (
+          <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-accent px-1 text-center text-[10px] font-semibold leading-[18px] text-white">
+            {pendingUsers}
+          </span>
+        )}
         <svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
           <circle cx="10" cy="10" r="2.6" />
           <path
@@ -131,6 +151,27 @@ function SettingsMenu() {
       {open && (
         <div role="menu" className="absolute right-0 top-11 z-30 w-52 overflow-hidden rounded-md border border-line bg-surface shadow-pop">
           <p className="border-b border-line px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">Configurações</p>
+          {isAdmin && (
+            <Link
+              href="/usuarios"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className={clsx(
+                "flex items-center gap-2 border-b border-line px-3.5 py-2 text-[13px] hover:bg-sunken hover:text-ink",
+                pathname.startsWith("/usuarios") ? "font-medium text-accent-strong" : "text-ink-soft"
+              )}
+            >
+              <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                <circle cx="8" cy="7" r="3" />
+                <path d="M2.5 16.5c.6-2.8 2.9-4.5 5.5-4.5s4.9 1.7 5.5 4.5" strokeLinecap="round" />
+                <path d="M13.5 4.2a3 3 0 0 1 0 5.6M15.5 12.4c1.1.8 1.8 2.2 2 4.1" strokeLinecap="round" />
+              </svg>
+              <span className="flex-1">Usuários</span>
+              {pendingUsers > 0 && (
+                <span className="rounded-full bg-accent px-1.5 text-[10px] font-semibold leading-4 text-white">{pendingUsers}</span>
+              )}
+            </Link>
+          )}
           <form action={logout}>
             <button
               type="submit"

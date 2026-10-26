@@ -73,30 +73,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </svg>
             }
           />
-
-          {user.role === "ADMIN" && (
-            <>
-              <div className="mt-5 px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Administração</div>
-              <SidebarLink
-                href="/usuarios"
-                label="Usuários"
-                badge={pending || undefined}
-                icon={
-                  <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
-                    <circle cx="8" cy="7" r="3" />
-                    <path d="M2.5 16.5c.6-2.8 2.9-4.5 5.5-4.5s4.9 1.7 5.5 4.5" strokeLinecap="round" />
-                    <path d="M13.5 4.2a3 3 0 0 1 0 5.6M15.5 12.4c1.1.8 1.8 2.2 2 4.1" strokeLinecap="round" />
-                  </svg>
-                }
-              />
-            </>
-          )}
         </nav>
 
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar name={user.name} email={user.email} role={user.role} prompts={titles} />
+        {/* Usuários (administração) fica no menu de configurações da barra superior */}
+        <TopBar name={user.name} email={user.email} role={user.role} prompts={titles} pendingUsers={pending} />
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
     </div>
