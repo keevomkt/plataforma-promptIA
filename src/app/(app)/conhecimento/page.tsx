@@ -13,6 +13,7 @@ import { UnitLogo } from "@/components/Brand";
 import { BUSINESS_UNITS, resolveUnit, type BusinessUnitId } from "@/lib/brand";
 import { GENERAL_TAB as GENERAL, knowledgeTab as tabOf } from "@/lib/knowledge/tabs";
 import { requireUser } from "@/lib/auth/session";
+import { canEditKnowledge } from "@/lib/auth/roles";
 
 // Abas na mesma ordem da barra lateral; a primeira abre por padrão
 const UNIT_TABS: BusinessUnitId[] = ["HCM", "EC", "ERP", "3UN"];
@@ -25,8 +26,8 @@ function formatSize(bytes: number) {
 
 export default async function KnowledgePage({ searchParams }: { searchParams: { q?: string; unidade?: string; categoria?: string } }) {
   const [user, docs, units] = await Promise.all([requireUser(), listKnowledgeDocuments(), listBusinessUnits()]);
-  // Quem não é administrador só consulta: sem envio de arquivos
-  const canEdit = user.role === "ADMIN";
+  // Administrador e curadoria de IA enviam arquivos; os demais só consultam
+  const canEdit = canEditKnowledge(user.role);
   const q = searchParams.q?.trim() ?? "";
   const requested = searchParams.unidade?.toUpperCase();
   const tab = requested === GENERAL ? GENERAL : resolveUnit(requested)?.id ?? UNIT_TABS[0];

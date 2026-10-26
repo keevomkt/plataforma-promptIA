@@ -3,12 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { approveUser, rejectUser, resetUserPassword, setUserBlocked, setUserRole } from "@/lib/actions/users";
+import { ROLE_LABELS, ROLES, type Role } from "@/lib/auth/roles";
 
 export type AdminUserRow = {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "USUARIO";
+  role: Role;
   status: "PENDENTE" | "ATIVO" | "BLOQUEADO";
   createdAt: string;
   lastLoginAt: string | null;
@@ -62,14 +63,19 @@ export function UserRowActions({ user }: { user: AdminUserRow }) {
         {user.status !== "PENDENTE" && (
           <>
             {user.status === "ATIVO" && (
-              <button
-                type="button"
+              <select
+                value={user.role}
                 disabled={pending}
-                className={neutral}
-                onClick={() => run("role", () => setUserRole(user.id, user.role === "ADMIN" ? "USUARIO" : "ADMIN"), true)}
+                onChange={(e) => run("role", () => setUserRole(user.id, e.target.value as Role))}
+                className={`${neutral} pr-1`}
+                aria-label={`Permissão de ${user.name}`}
               >
-                {label("role", user.role === "ADMIN" ? "Tornar usuário" : "Tornar administrador")}
-              </button>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r]}
+                  </option>
+                ))}
+              </select>
             )}
             <button type="button" disabled={pending} className={neutral} onClick={() => run("reset", () => resetUserPassword(user.id), true)}>
               {label("reset", "Gerar senha provisória")}

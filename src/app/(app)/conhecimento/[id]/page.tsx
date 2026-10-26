@@ -5,6 +5,7 @@ import { formatDateTime } from "@/lib/data";
 import { listBusinessUnits } from "@/lib/knowledge/data";
 import { Card, CardBody, CardHeader, CurrentTag, Eyebrow } from "@/components/ui/Surfaces";
 import { requireUser } from "@/lib/auth/session";
+import { canEditKnowledge } from "@/lib/auth/roles";
 import { UnitLogo } from "@/components/Brand";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 import { knowledgeTab } from "@/lib/knowledge/tabs";
@@ -35,8 +36,8 @@ export default async function KnowledgeDocumentPage({ params }: { params: { id: 
     select: { content: true, fileName: true },
   });
   const [user, units] = await Promise.all([requireUser(), listBusinessUnits()]);
-  // Quem não é administrador só consulta: vê os dados e o texto, sem editar, substituir ou trocar revisão
-  const canEdit = user.role === "ADMIN";
+  // Administrador e curadoria de IA editam; os demais só consultam (dados e texto, sem substituir nem trocar revisão)
+  const canEdit = canEditKnowledge(user.role);
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-6 py-6">

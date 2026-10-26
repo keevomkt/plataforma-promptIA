@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { apiUser, forbidden, unauthorized } from "@/lib/auth/session";
+import { canEditKnowledge } from "@/lib/auth/roles";
 import { extractText } from "@/lib/knowledge/extract";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 
@@ -9,7 +10,7 @@ import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 export async function POST(req: NextRequest) {
   const me = await apiUser();
   if (!me) return unauthorized();
-  if (me.role !== "ADMIN") return forbidden();
+  if (!canEditKnowledge(me.role)) return forbidden();
   const form = await req.formData();
   const businessUnit = String(form.get("businessUnit") ?? "").trim();
   const category = String(form.get("category") ?? "");

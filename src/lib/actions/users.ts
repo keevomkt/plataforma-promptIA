@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/session";
+import { ROLES, type Role } from "@/lib/auth/roles";
 import { hashPassword, temporaryPassword } from "@/lib/auth/password";
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -60,12 +61,13 @@ export async function setUserBlocked(id: string, blocked: boolean): Promise<Acti
   return { ok: true, data: null };
 }
 
-export async function setUserRole(id: string, role: "ADMIN" | "USUARIO"): Promise<ActionResult<null>> {
+export async function setUserRole(id: string, role: Role): Promise<ActionResult<null>> {
   const admin = await requireAdmin();
+  if (!ROLES.includes(role)) return { ok: false, error: "Permissão inválida." };
   const t = await target(id, admin.id);
   if ("error" in t) return { ok: false, error: t.error! };
   if (t.user.status !== "ATIVO") return { ok: false, error: "Só contas ativas podem mudar de permissão." };
-  if (role === "USUARIO" && t.user.role === "ADMIN" && (await wouldLeaveNoAdmin(id))) return { ok: false, error: "Não é possível remover o último administrador." };
+  if (role !== "ADMIN" && t.user.role === "ADMIN" && (await wouldLeaveNoAdmin(id))) return { ok: false, error: "Não é possível remover o último administrador." };
   await prisma.user.update({ where: { id }, data: { role } });
   refresh();
   return { ok: true, data: null };

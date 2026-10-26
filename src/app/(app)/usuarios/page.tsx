@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/session";
+import { ROLE_LABELS, toRole } from "@/lib/auth/roles";
 import { formatDateTime } from "@/lib/data";
 import { UserRowActions, type AdminUserRow } from "@/components/auth/UserRowActions";
 import { Card, CardBody, Eyebrow, Pill } from "@/components/ui/Surfaces";
@@ -11,7 +12,7 @@ export default async function UsersPage() {
     id: u.id,
     name: u.name,
     email: u.email,
-    role: u.role === "ADMIN" ? "ADMIN" : "USUARIO",
+    role: toRole(u.role),
     status: u.status as AdminUserRow["status"],
     createdAt: formatDateTime(u.createdAt),
     lastLoginAt: u.lastLoginAt ? formatDateTime(u.lastLoginAt) : null,
@@ -27,11 +28,18 @@ export default async function UsersPage() {
     <div className="mx-auto max-w-4xl space-y-5 px-6 py-6">
       <div>
         <h1 className="text-[20px] font-semibold text-ink">Usuários</h1>
-        <p className="text-[13px] text-ink-faint">Aprove cadastros, defina quem é administrador, bloqueie acessos e gere senhas provisórias.</p>
-        <p className="mt-1 text-[12.5px] text-ink-faint">
-          <strong className="font-medium text-ink-soft">Administrador</strong> cadastra e altera agentes e a base de conhecimento.{" "}
-          <strong className="font-medium text-ink-soft">Usuário</strong> só visualiza a aba Prompt de cada agente e a base de conhecimento.
-        </p>
+        <p className="text-[13px] text-ink-faint">Aprove cadastros, defina a permissão de cada pessoa, bloqueie acessos e gere senhas provisórias.</p>
+        <ul className="mt-1.5 space-y-0.5 text-[12.5px] text-ink-faint">
+          <li>
+            <strong className="font-medium text-ink-soft">Administrador</strong>: cadastra e altera agentes, a base de conhecimento e os usuários.
+          </li>
+          <li>
+            <strong className="font-medium text-ink-soft">Curadoria de IA</strong>: adiciona e altera documentos da base de conhecimento; nos agentes, só lê a aba Prompt.
+          </li>
+          <li>
+            <strong className="font-medium text-ink-soft">Usuário</strong>: só visualiza a aba Prompt de cada agente e a base de conhecimento.
+          </li>
+        </ul>
       </div>
 
       <Card>
@@ -67,7 +75,7 @@ export default async function UsersPage() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[14px] font-medium text-ink">{u.name}</span>
                     {u.isMe && <span className="text-[11px] text-ink-faint">(você)</span>}
-                    <Pill tone={u.role === "ADMIN" ? "accent" : "neutral"}>{u.role === "ADMIN" ? "Administrador" : "Usuário"}</Pill>
+                    <Pill tone={u.role === "ADMIN" ? "accent" : u.role === "CURADORIA" ? "added" : "neutral"}>{ROLE_LABELS[u.role]}</Pill>
                     {u.status === "BLOQUEADO" && <Pill tone="removed">Bloqueado</Pill>}
                     {u.locked && <Pill tone="warn">Travado por tentativas</Pill>}
                     {u.mustChangePassword && <Pill tone="warn">Senha provisória</Pill>}

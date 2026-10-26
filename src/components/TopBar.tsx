@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { UnitLogo } from "@/components/Brand";
 import { EditPromptDialog } from "@/components/EditPromptDialog";
 import { logout } from "@/lib/actions/auth";
+import { ROLE_LABELS, type Role } from "@/lib/auth/roles";
 
 const iconButton =
   "flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface text-ink-soft transition-colors hover:border-line-strong hover:text-ink";
@@ -13,7 +14,7 @@ const iconButton =
 type PromptTitle = { id: string; slug: string; name: string; description: string | null; unit: string | null; version: number | null };
 
 /** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema, configurações e perfil à direita. */
-export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: "ADMIN" | "USUARIO"; prompts: PromptTitle[] }) {
+export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: Role; prompts: PromptTitle[] }) {
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/80 px-6 backdrop-blur">
       <CurrentPrompt prompts={prompts} canEdit={role === "ADMIN"} />
@@ -148,7 +149,7 @@ function SettingsMenu() {
   );
 }
 
-function ProfileMenu({ name, email, role }: { name: string; email: string; role: "ADMIN" | "USUARIO" }) {
+function ProfileMenu({ name, email, role }: { name: string; email: string; role: Role }) {
   const { open, setOpen, ref } = useMenu();
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   const firstName = name.trim().split(/\s+/)[0];
@@ -170,7 +171,7 @@ function ProfileMenu({ name, email, role }: { name: string; email: string; role:
           <div className="border-b border-line px-3.5 py-3">
             <p className="truncate text-[13.5px] font-semibold text-ink">{name}</p>
             <p className="truncate text-[12px] text-ink-faint">{email}</p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-accent">{role === "ADMIN" ? "Administrador" : "Usuário · só visualização"}</p>
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-accent">{ROLE_LABELS[role]}{role === "USUARIO" && " · só visualização"}</p>
           </div>
           <Link href="/conta" role="menuitem" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-[13px] text-ink-soft hover:bg-sunken hover:text-ink">
             Minha conta

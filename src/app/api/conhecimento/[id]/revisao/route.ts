@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { apiUser, forbidden, unauthorized } from "@/lib/auth/session";
+import { canEditKnowledge } from "@/lib/auth/roles";
 import { extractText } from "@/lib/knowledge/extract";
 
 /** Substitui o arquivo de um documento: cria uma nova revisão e ela passa a valer. */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const me = await apiUser();
   if (!me) return unauthorized();
-  if (me.role !== "ADMIN") return forbidden();
+  if (!canEditKnowledge(me.role)) return forbidden();
   const doc = await prisma.knowledgeDocument.findUnique({ where: { id: params.id } });
   if (!doc) return NextResponse.json({ error: "Documento não encontrado." }, { status: 404 });
 

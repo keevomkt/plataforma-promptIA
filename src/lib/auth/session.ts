@@ -9,8 +9,9 @@ import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authSecret, SESSION_COOKIE, SESSION_DAYS, signSession, verifySession } from "./token";
+import { canEditKnowledge, toRole, type Role } from "./roles";
 
-export type Role = "ADMIN" | "USUARIO";
+export type { Role };
 
 export type SessionUser = {
   id: string;
@@ -26,7 +27,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!payload) return null;
   const u = await prisma.user.findUnique({ where: { id: payload.userId } });
   if (!u || u.status !== "ATIVO" || u.sessionVersion !== payload.version) return null;
-  return { id: u.id, name: u.name, email: u.email, role: u.role === "ADMIN" ? "ADMIN" : "USUARIO", mustChangePassword: u.mustChangePassword };
+  return { id: u.id, name: u.name, email: u.email, role: toRole(u.role), mustChangePassword: u.mustChangePassword };
 });
 
 /**
@@ -50,9 +51,9 @@ export function unauthorized() {
   return NextResponse.json({ error: "Faça login para continuar." }, { status: 401 });
 }
 
-/** Para rotas de API que alteram algo: quem não é administrador só visualiza. */
+/** Para rotas de API que alteram algo sem a permissão do papel (ver ./roles). */
 export function forbidden() {
-  return NextResponse.json({ error: "Somente administradores podem fazer alterações." }, { status: 403 });
+  return NextResponse.json({ error: "Seu acesso não permite fazer esta alteração." }, { status: 403 });
 }
 
 /**
@@ -62,6 +63,13 @@ export function forbidden() {
 export async function requireAdmin(fallback = "/"): Promise<SessionUser> {
   const user = await requireUser();
   if (user.role !== "ADMIN") redirect(fallback);
+  return user;
+}
+
+/** Exige quem pode alterar a base de conhecimento: administrador ou curadoria de IA. */
+export async function requireKnowledgeEditor(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!canEditKnowledge(user.role)) redirect("/conhecimento");
   return user;
 }
 
