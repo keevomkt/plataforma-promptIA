@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion } from "@/lib/data";
-import { requireUser } from "@/lib/auth/session";
+import { requireAdmin } from "@/lib/auth/session";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { validateChange } from "@/lib/engine/validate";
 import { parsePrompt, sectionLabel, splitLines } from "@/lib/engine/parse";
@@ -50,7 +50,7 @@ export async function createPrompt(input: {
   topP: number;
   sourceLabel?: string;
 }): Promise<ActionResult<{ slug: string }>> {
-  const user = (await requireUser()).name;
+  const user = (await requireAdmin()).name;
   const name = input.name.trim();
   if (!name) return { ok: false, error: "Dê um nome ao prompt (ex: Agente Comercial)." };
   if (!input.content.trim()) return { ok: false, error: "Cole o texto do prompt ou importe um arquivo .txt/.md." };
@@ -101,7 +101,7 @@ export async function submitManualEdit(input: {
   baseVersionId: string;
   content: string;
 }): Promise<ActionResult<{ changeId: string }>> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   const current = await getCurrentVersion(input.promptId);
   if (!current) return { ok: false, error: "Prompt sem versão." };
   if (current.id !== input.baseVersionId) {
@@ -166,7 +166,7 @@ export async function updateParams(input: {
   temperature: number;
   topP: number;
 }): Promise<ActionResult<{ version: number }>> {
-  const user = (await requireUser()).name;
+  const user = (await requireAdmin()).name;
   const paramError = checkParams(input.temperature, input.topP);
   if (paramError) return { ok: false, error: paramError };
   const current = await getCurrentVersion(input.promptId);
@@ -219,9 +219,32 @@ export async function updateParams(input: {
   return { ok: true, data: { version: created.version } };
 }
 
-/** Define a unidade de negócio do prompt (HCM, ERP, EC), usada para exibir a logo correspondente. */
+/**
+ * Edita o cadastro do agente (nome, descrição e unidade). Não mexe no texto
+ * nem gera versão. O endereço (slug) continua o mesmo, para não quebrar links.
+ */
+export async function updatePromptInfo(input: {
+  promptId: string;
+  name: string;
+  description?: string;
+  businessUnit?: string | null;
+}): Promise<ActionResult<null>> {
+  await requireAdmin();
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Dê um nome ao prompt (ex: Agente Comercial)." };
+  const resolved = input.businessUnit ? resolveUnit(input.businessUnit) : undefined;
+  if (input.businessUnit && !resolved) return { ok: false, error: "Unidade de negócio inválida." };
+  await prisma.prompt.update({
+    where: { id: input.promptId },
+    data: { name, description: input.description?.trim() || null, businessUnit: resolved?.id ?? null },
+  });
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/** Define a unidade de negócio do prompt (HCM, ERP, EC, 3UN), usada para exibir a logo correspondente. */
 export async function setPromptUnit(promptId: string, unit: string | null): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const resolved = unit ? resolveUnit(unit) : undefined;
   if (unit && !resolved) return { ok: false, error: "Unidade de negócio inválida." };
   await prisma.prompt.update({ where: { id: promptId }, data: { businessUnit: resolved?.id ?? null } });

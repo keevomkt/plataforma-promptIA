@@ -1,22 +1,37 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Form";
 import { Card, CardBody, CardHeader } from "@/components/ui/Surfaces";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 import { UNIT_IDS } from "@/lib/brand";
+import { GENERAL_TAB, knowledgeTab } from "@/lib/knowledge/tabs";
 import { UnitLogo } from "@/components/Brand";
 
 const ACCEPT = ".pdf,.docx,.txt,.md,.markdown,.csv,.json";
 
-export function KnowledgeUpload({ units, maxMb }: { units: string[]; maxMb: number }) {
+/** `tab`: aba aberta na tela (HCM, EC, ERP, 3UN ou GERAL); a unidade do envio acompanha a aba. */
+export function KnowledgeUpload({ units, maxMb, tab }: { units: string[]; maxMb: number; tab: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [unit, setUnit] = useState("");
+  const [unit, setUnit] = useState(tab === GENERAL_TAB ? "" : tab);
+  // Trocar de aba troca a unidade marcada, para não enviar para a unidade errada por descuido
+  // (uma unidade digitada que já é da aba, ex: "Institucional" na Geral, fica como está)
+  useEffect(() => setUnit((u) => (u.trim() && knowledgeTab(u) === tab ? u : tab === GENERAL_TAB ? "" : tab)), [tab]);
+
+  /** O inverso: escolher a unidade aqui abre a aba dela, para a lista abaixo mostrar a mesma unidade. */
+  function openTabOf(value: string) {
+    if (!value.trim() || knowledgeTab(value) === tab) return;
+    const next = new URLSearchParams(params.toString());
+    next.set("unidade", knowledgeTab(value));
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
+  }
   const [category, setCategory] = useState("PRODUTOS");
   const [description, setDescription] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -124,7 +139,10 @@ export function KnowledgeUpload({ units, maxMb }: { units: string[]; maxMb: numb
             <button
               key={id}
               type="button"
-              onClick={() => setUnit(id)}
+              onClick={() => {
+                setUnit(id);
+                openTabOf(id);
+              }}
               className={clsx(
                 "flex items-center gap-2 rounded border px-2 py-1 text-[12.5px] transition-colors",
                 unit.trim().toUpperCase() === id ? "border-accent bg-accent-soft text-accent-strong ring-1 ring-accent" : "border-line bg-surface text-ink-soft hover:border-line-strong"
@@ -139,7 +157,7 @@ export function KnowledgeUpload({ units, maxMb }: { units: string[]; maxMb: numb
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Unidade de negócio" hint="Ex: HCM, ERP, EC, Institucional">
-            <Input value={unit} onChange={(e) => setUnit(e.target.value)} list="kb-units" placeholder="Digite ou escolha" />
+            <Input value={unit} onChange={(e) => setUnit(e.target.value)} onBlur={() => openTabOf(unit)} list="kb-units" placeholder="Digite ou escolha" />
             <datalist id="kb-units">
               {Array.from(new Set([...UNIT_IDS, ...units])).map((u) => (
                 <option key={u} value={u} />

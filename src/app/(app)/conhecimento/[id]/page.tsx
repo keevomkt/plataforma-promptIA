@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/data";
 import { listBusinessUnits } from "@/lib/knowledge/data";
-import { Card, CardBody, CardHeader, CurrentTag } from "@/components/ui/Surfaces";
+import { Card, CardBody, CardHeader, CurrentTag, Eyebrow } from "@/components/ui/Surfaces";
+import { requireUser } from "@/lib/auth/session";
+import { UnitLogo } from "@/components/Brand";
+import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
+import { knowledgeTab } from "@/lib/knowledge/tabs";
 import { KnowledgeMetaForm } from "@/components/knowledge/KnowledgeMetaForm";
 import { KnowledgeReplace } from "@/components/knowledge/KnowledgeReplace";
 import { MAX_FILE_MB } from "@/lib/knowledge/extract";
@@ -30,21 +34,43 @@ export default async function KnowledgeDocumentPage({ params }: { params: { id: 
     where: { documentId_revision: { documentId: doc.id, revision: doc.currentRevision } },
     select: { content: true, fileName: true },
   });
-  const units = await listBusinessUnits();
+  const [user, units] = await Promise.all([requireUser(), listBusinessUnits()]);
+  // Quem não é administrador só consulta: vê os dados e o texto, sem editar, substituir ou trocar revisão
+  const canEdit = user.role === "ADMIN";
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-6 py-6">
-      <Link href="/conhecimento" className="text-xs font-medium text-ink-faint hover:text-ink-soft">
+      <Link href={`/conhecimento?unidade=${knowledgeTab(doc.businessUnit)}`} className="text-xs font-medium text-ink-faint hover:text-ink-soft">
         ← Base de conhecimento
       </Link>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <KnowledgeMetaForm
-            id={doc.id}
-            units={units}
-            initial={{ title: doc.title, businessUnit: doc.businessUnit, category: doc.category, description: doc.description ?? "" }}
-          />
+          {canEdit ? (
+            <KnowledgeMetaForm
+              id={doc.id}
+              units={units}
+              initial={{ title: doc.title, businessUnit: doc.businessUnit, category: doc.category, description: doc.description ?? "" }}
+            />
+          ) : (
+            <Card>
+              <CardBody className="space-y-2">
+                <h1 className="text-[16px] font-semibold text-ink">{doc.title}</h1>
+                <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-soft">
+                  <UnitLogo unit={doc.businessUnit} height={20} />
+                  <span>{doc.businessUnit}</span>
+                  <span className="text-ink-faint">·</span>
+                  <span>{KNOWLEDGE_CATEGORIES[doc.category] ?? doc.category}</span>
+                </div>
+                {doc.description && (
+                  <div>
+                    <Eyebrow>Descrição</Eyebrow>
+                    <p className="mt-0.5 text-[13px] text-ink-soft">{doc.description}</p>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-wrap items-center justify-between gap-2">
@@ -65,7 +91,7 @@ export default async function KnowledgeDocumentPage({ params }: { params: { id: 
         </div>
 
         <div className="space-y-4">
-          <KnowledgeReplace id={doc.id} maxMb={MAX_FILE_MB} />
+          {canEdit && <KnowledgeReplace id={doc.id} maxMb={MAX_FILE_MB} />}
 
           <Card>
             <CardHeader>
@@ -85,7 +111,7 @@ export default async function KnowledgeDocumentPage({ params }: { params: { id: 
                   <p className="text-[11.5px] text-ink-faint">
                     {formatDateTime(r.createdAt)} · {r.createdBy}
                   </p>
-                  <KnowledgeRevisionActions id={doc.id} revision={r.revision} isCurrent={r.revision === doc.currentRevision} />
+                  <KnowledgeRevisionActions id={doc.id} revision={r.revision} isCurrent={r.revision === doc.currentRevision} canEdit={canEdit} />
                 </div>
               ))}
             </CardBody>

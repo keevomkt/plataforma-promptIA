@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDate, formatDateTime, getCurrentVersion, getPromptBySlug, listVersions, readStringList } from "@/lib/data";
@@ -18,6 +19,8 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 export default async function HistoryPage({ params }: { params: { slug: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const current = await getCurrentVersion(prompt.id);
   const versions = await listVersions(prompt.id);

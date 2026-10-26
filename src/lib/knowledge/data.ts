@@ -21,7 +21,8 @@ export async function loadKnowledgeSources(): Promise<KnowledgeSource[]> {
 /**
  * Base de conhecimento que vale para um prompt: documentos da mesma unidade
  * de negócio (HCM, ERP, EC) + documentos gerais (unidade que não é nenhuma
- * das três, ex: "Institucional"). Prompt sem unidade usa a base inteira.
+ * das três, ex: "Institucional" ou "Keevo"). Prompt sem unidade ou das três
+ * unidades juntas (3UN) usa a base inteira.
  */
 export async function loadKnowledgeForPrompt(promptId: string): Promise<{ sources: KnowledgeSource[]; scope: string }> {
   const [prompt, all] = await Promise.all([
@@ -29,10 +30,10 @@ export async function loadKnowledgeForPrompt(promptId: string): Promise<{ source
     loadKnowledgeSources(),
   ]);
   const unit = resolveUnit(prompt?.businessUnit);
-  if (!unit) return { sources: all, scope: "toda a base" };
+  if (!unit || unit.allUnits) return { sources: all, scope: "toda a base" };
   const sources = all.filter((s) => {
     const docUnit = resolveUnit(s.businessUnit);
-    return !docUnit || docUnit.id === unit.id;
+    return !docUnit || docUnit.allUnits || docUnit.id === unit.id;
   });
   return { sources, scope: `unidade ${unit.id} + documentos gerais` };
 }

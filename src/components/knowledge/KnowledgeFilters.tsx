@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Form";
 import { KNOWLEDGE_CATEGORIES } from "@/lib/engine/types";
 
-export function KnowledgeFilters({ units }: { units: string[] }) {
+/** Busca e categoria dentro da aba (unidade) aberta: o parâmetro "unidade" é sempre mantido. */
+export function KnowledgeFilters({ unitLabel }: { unitLabel: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -30,15 +31,7 @@ export function KnowledgeFilters({ units }: { units: string[] }) {
         go({ q });
       }}
     >
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar no conteúdo dos documentos (ex: eKeep, preço, CNPJ)" className="min-w-[16rem] flex-1" />
-      <select value={params.get("unidade") ?? ""} onChange={(e) => go({ unidade: e.target.value })} className={select} aria-label="Unidade de negócio">
-        <option value="">Todas as unidades</option>
-        {units.map((u) => (
-          <option key={u} value={u}>
-            {u}
-          </option>
-        ))}
-      </select>
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Buscar nos documentos de ${unitLabel} (ex: preço, CNPJ)`} className="min-w-[16rem] flex-1" />
       <select value={params.get("categoria") ?? ""} onChange={(e) => go({ categoria: e.target.value })} className={select} aria-label="Categoria">
         <option value="">Todas as categorias</option>
         {Object.entries(KNOWLEDGE_CATEGORIES).map(([v, l]) => (
@@ -48,12 +41,12 @@ export function KnowledgeFilters({ units }: { units: string[] }) {
         ))}
       </select>
       <Button type="submit">Buscar</Button>
-      {(params.get("q") || params.get("unidade") || params.get("categoria")) && (
+      {(params.get("q") || params.get("categoria")) && (
         <Button
           variant="ghost"
           onClick={() => {
             setQ("");
-            router.push(pathname);
+            go({ q: "", categoria: "" });
           }}
         >
           Limpar

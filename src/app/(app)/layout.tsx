@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   // Título do prompt aberto, mostrado na barra superior
   const titles = prompts.map((p) => ({
+    id: p.id,
     slug: p.slug,
     name: p.name,
     description: p.description,
@@ -36,7 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </Link>
 
         <nav className="flex-1 overflow-y-auto px-2 py-3">
-          <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Prompts</div>
+          <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Agentes</div>
           <ul className="space-y-0.5">
             {prompts.map((p) => (
               <li key={p.id}>
@@ -54,9 +55,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </li>
             ))}
           </ul>
-          <Link href="/?novo=1" className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-surface/80">
-            + Novo prompt
-          </Link>
+          {user.role === "ADMIN" && (
+            <Link href="/?novo=1" className="mt-2 block rounded px-2.5 py-1.5 text-[13px] font-medium text-accent hover:bg-surface/80">
+              + Novo agente
+            </Link>
+          )}
 
           <div className="mt-5 px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent-strong/60">Referência</div>
           <SidebarLink

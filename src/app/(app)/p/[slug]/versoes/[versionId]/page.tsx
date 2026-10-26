@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatDateTime, getCurrentVersion, getPromptBySlug, getVersion } from "@/lib/data";
@@ -8,6 +9,8 @@ import { estimateTokens, formatCount } from "@/lib/tokens";
 import { CopyToKeevo } from "@/components/CopyToKeevo";
 
 export default async function VersionPage({ params }: { params: { slug: string; versionId: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const version = await getVersion(prompt.id, params.versionId);
   const current = await getCurrentVersion(prompt.id);

@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import {
@@ -23,6 +24,8 @@ import { AuditReport } from "@/components/change/AuditReport";
 import { AnswerReport } from "@/components/change/AnswerReport";
 
 export default async function ChangeDetailPage({ params }: { params: { slug: string; changeId: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const change = await getChange(prompt.id, params.changeId);
   const current = await getCurrentVersion(prompt.id);

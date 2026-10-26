@@ -8,9 +8,8 @@ import { Card, CardBody, CardHeader, Eyebrow } from "@/components/ui/Surfaces";
 import { createPrompt } from "@/lib/actions/prompts";
 import { parsePrompt, sectionLabel, structureSummary, visibleSections } from "@/lib/engine/parse";
 import { formatCount } from "@/lib/tokens";
-import clsx from "clsx";
-import { BUSINESS_UNITS, UNIT_IDS, type BusinessUnitId } from "@/lib/brand";
-import { UnitLogo } from "@/components/Brand";
+import type { BusinessUnitId } from "@/lib/brand";
+import { UnitChoice } from "@/components/UnitChoice";
 
 export function NewPromptForm() {
   const router = useRouter();
@@ -62,31 +61,13 @@ export function NewPromptForm() {
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_280px]">
       <Card>
         <CardBody className="space-y-4">
-          <div>
-            <span className="mb-1.5 block text-[13px] font-medium text-ink-soft">Unidade de negócio</span>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {UNIT_IDS.map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => {
-                    setUnit(unit === id ? null : id);
-                    if (!name) setName(id);
-                  }}
-                  className={clsx(
-                    "flex items-center gap-3 rounded border px-3 py-2.5 text-left transition-colors",
-                    unit === id ? "border-accent bg-accent-soft ring-1 ring-accent" : "border-line bg-surface hover:border-line-strong"
-                  )}
-                >
-                  <UnitLogo unit={id} height={28} />
-                  <span className="leading-tight">
-                    <span className="block text-[13px] font-semibold text-ink">{id}</span>
-                    <span className="block text-[11.5px] text-ink-faint">{BUSINESS_UNITS[id].brand}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <UnitChoice
+            value={unit}
+            onChange={(next) => {
+              setUnit(next);
+              if (!name && next) setName(next);
+            }}
+          />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nome">
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Agente Comercial Keevo" />

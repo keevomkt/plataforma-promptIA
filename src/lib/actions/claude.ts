@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion } from "@/lib/data";
-import { requireUser } from "@/lib/auth/session";
+import { requireAdmin } from "@/lib/auth/session";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { resolveUnit } from "@/lib/brand";
 import { buildClaudePackage } from "@/lib/claude/package";
@@ -15,7 +15,7 @@ type ImportResult = { ok: true; data: { changeId: string; slug: string } } | { o
 
 /** Monta o pacote (relato + prompt atual numerado + base da unidade) para colar no Claude. */
 export async function getClaudePackage(promptId: string, problem: string, expected: string): Promise<ActionResult<{ text: string; version: number }>> {
-  await requireUser();
+  await requireAdmin();
   if (!problem.trim()) return { ok: false, error: "Descreva o problema relatado pela curadoria." };
   const prompt = await prisma.prompt.findUnique({ where: { id: promptId } });
   const current = prompt ? await getCurrentVersion(promptId) : null;
@@ -46,7 +46,7 @@ export async function importClaudeAnswer(
   promptId: string,
   input: { problem: string; expected: string; answer: string }
 ): Promise<ImportResult> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   const problem = input.problem.trim();
   if (!problem) return { ok: false, error: "Descreva o problema relatado pela curadoria (ele vira o motivo da nova versão).", notes: [], showFormat: false };
   if (!input.answer.trim()) return { ok: false, error: "Cole a resposta do Claude.", notes: [], showFormat: false };

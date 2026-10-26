@@ -1,9 +1,12 @@
+import { requireAdmin } from "@/lib/auth/session";
 import Link from "next/link";
 import { getPromptBySlug, getVersion, listVersions } from "@/lib/data";
 import { RuleDiffView } from "@/components/change/RuleDiffView";
 import { ComparePicker } from "@/components/ComparePicker";
 
 export default async function ComparePage({ params, searchParams }: { params: { slug: string }; searchParams: { de?: string; para?: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const versions = await listVersions(prompt.id);
   const from = searchParams.de ? await getVersion(prompt.id, searchParams.de) : versions[1];

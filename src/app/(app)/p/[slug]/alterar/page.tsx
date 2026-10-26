@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/session";
 import { getPromptBySlug, listChanges } from "@/lib/data";
 import { ChangeRequestForm } from "@/components/ChangeRequestForm";
 import { ClaudeAssist } from "@/components/ClaudeAssist";
@@ -9,6 +10,8 @@ const OPEN = ["AGUARDANDO_ESCLARECIMENTO", "AGUARDANDO_APROVACAO", "APLICADA"];
 const DELETABLE = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
 
 export default async function ChangePage({ params, searchParams }: { params: { slug: string }; searchParams: { pedido?: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const changes = (await listChanges(prompt.id)).filter((c) => c.kind === "PEDIDO" || c.kind === "MANUAL" || c.kind === "DIAGNOSTICO" || c.kind === "CLAUDE");
   const open = changes.filter((c) => OPEN.includes(c.status));

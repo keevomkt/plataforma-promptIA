@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiUser, unauthorized } from "@/lib/auth/session";
+import { apiUser, forbidden, unauthorized } from "@/lib/auth/session";
 
 export async function GET(req: NextRequest, { params }: { params: { slug: string; versionId: string } }) {
   const me = await apiUser();
   if (!me) return unauthorized();
+  // Versões antigas fazem parte do histórico, que só administradores veem
+  if (me.role !== "ADMIN") return forbidden();
   const version = await prisma.promptVersion.findUnique({ where: { id: params.versionId }, include: { prompt: true } });
   if (!version || version.prompt.slug !== params.slug) {
     return NextResponse.json({ error: "Versão não encontrada." }, { status: 404 });

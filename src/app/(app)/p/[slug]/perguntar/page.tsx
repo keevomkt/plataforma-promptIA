@@ -1,3 +1,4 @@
+import { requireAdmin } from "@/lib/auth/session";
 import { getCurrentVersion, getPromptBySlug } from "@/lib/data";
 import { isRuleLine, parsePrompt } from "@/lib/engine/parse";
 import { answerQuestion } from "@/lib/engine/locate";
@@ -16,6 +17,8 @@ import { formatDateTime } from "@/lib/data";
  * pergunta vai no endereço (?q=) e fica registrada só no histórico da aba.
  */
 export default async function AskPage({ params, searchParams }: { params: { slug: string }; searchParams: { q?: string } }) {
+  // Só administradores: quem só visualiza fica na aba Prompt
+  await requireAdmin(`/p/${encodeURIComponent(params.slug)}`);
   const prompt = await getPromptBySlug(params.slug);
   const current = await getCurrentVersion(prompt.id);
   const q = (searchParams.q ?? "").trim().slice(0, 500);

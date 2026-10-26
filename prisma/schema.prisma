@@ -57,7 +57,7 @@ model Prompt {
   name        String
   slug        String   @unique
   description String?
-  // Unidade de negócio do agente: HCM (eKeep) | ERP (Alpha) | EC (Holos). Ver src/lib/brand.ts
+  // Unidade de negócio do agente: HCM (eKeep) | ERP (Alpha) | EC (Holos) | 3UN (Keevo, as três). Ver src/lib/brand.ts
   businessUnit String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

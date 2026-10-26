@@ -4,18 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { UnitLogo } from "@/components/Brand";
+import { EditPromptDialog } from "@/components/EditPromptDialog";
 import { logout } from "@/lib/actions/auth";
 
 const iconButton =
   "flex h-9 w-9 items-center justify-center rounded-md border border-line bg-surface text-ink-soft transition-colors hover:border-line-strong hover:text-ink";
 
-type PromptTitle = { slug: string; name: string; description: string | null; unit: string | null; version: number | null };
+type PromptTitle = { id: string; slug: string; name: string; description: string | null; unit: string | null; version: number | null };
 
 /** Barra superior: o prompt aberto (unidade, nome e versão) à esquerda; tema, configurações e perfil à direita. */
 export function TopBar({ name, email, role, prompts }: { name: string; email: string; role: "ADMIN" | "USUARIO"; prompts: PromptTitle[] }) {
   return (
     <div className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-line bg-surface/80 px-6 backdrop-blur">
-      <CurrentPrompt prompts={prompts} />
+      <CurrentPrompt prompts={prompts} canEdit={role === "ADMIN"} />
       <div className="flex shrink-0 items-center gap-2">
         <ThemeToggle />
         <SettingsMenu />
@@ -25,23 +26,41 @@ export function TopBar({ name, email, role, prompts }: { name: string; email: st
   );
 }
 
-function CurrentPrompt({ prompts }: { prompts: PromptTitle[] }) {
+function CurrentPrompt({ prompts, canEdit }: { prompts: PromptTitle[]; canEdit: boolean }) {
   const pathname = usePathname();
   const slug = /^\/p\/([^/]+)/.exec(pathname)?.[1];
   const prompt = slug ? prompts.find((p) => p.slug === decodeURIComponent(slug)) : undefined;
+  const [editing, setEditing] = useState(false);
   if (!prompt) return <span />;
   return (
-    <Link href={`/p/${prompt.slug}`} className="flex min-w-0 items-center gap-3" title={prompt.description ?? prompt.name}>
-      {prompt.unit ? (
-        <UnitLogo unit={prompt.unit} height={30} priority />
-      ) : (
-        <span className="h-[30px] w-[30px] shrink-0 rounded-md border border-dashed border-line-strong" />
+    <div className="flex min-w-0 items-center gap-2">
+      <Link href={`/p/${prompt.slug}`} className="flex min-w-0 items-center gap-3" title={prompt.description ?? prompt.name}>
+        {prompt.unit ? (
+          <UnitLogo unit={prompt.unit} height={30} priority />
+        ) : (
+          <span className="h-[30px] w-[30px] shrink-0 rounded-md border border-dashed border-line-strong" />
+        )}
+        <h1 className="truncate text-[16px] font-semibold text-ink">{prompt.name}</h1>
+        {prompt.version !== null && (
+          <span className="shrink-0 rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent-strong">v{prompt.version}</span>
+        )}
+      </Link>
+      {canEdit && (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-sunken hover:text-ink"
+        title="Editar agente (nome, descrição e unidade)"
+        aria-label="Editar agente"
+      >
+        <svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+          <path d="M13.5 3.5 16.5 6.5 7 16H4v-3l9.5-9.5Z" strokeLinejoin="round" />
+          <path d="m11.5 5.5 3 3" />
+        </svg>
+      </button>
       )}
-      <h1 className="truncate text-[16px] font-semibold text-ink">{prompt.name}</h1>
-      {prompt.version !== null && (
-        <span className="shrink-0 rounded-sm bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold text-accent-strong">v{prompt.version}</span>
-      )}
-    </Link>
+      {canEdit && editing &&<EditPromptDialog prompt={prompt} onClose={() => setEditing(false)} />}
+    </div>
   );
 }
 
@@ -151,7 +170,7 @@ function ProfileMenu({ name, email, role }: { name: string; email: string; role:
           <div className="border-b border-line px-3.5 py-3">
             <p className="truncate text-[13.5px] font-semibold text-ink">{name}</p>
             <p className="truncate text-[12px] text-ink-faint">{email}</p>
-            <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-accent">{role === "ADMIN" ? "Administrador" : "Usuário"}</p>
+            <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-accent">{role === "ADMIN" ? "Administrador" : "Usuário · só visualização"}</p>
           </div>
           <Link href="/conta" role="menuitem" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-[13px] text-ink-soft hover:bg-sunken hover:text-ink">
             Minha conta

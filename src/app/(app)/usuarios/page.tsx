@@ -28,6 +28,10 @@ export default async function UsersPage() {
       <div>
         <h1 className="text-[20px] font-semibold text-ink">Usuários</h1>
         <p className="text-[13px] text-ink-faint">Aprove cadastros, defina quem é administrador, bloqueie acessos e gere senhas provisórias.</p>
+        <p className="mt-1 text-[12.5px] text-ink-faint">
+          <strong className="font-medium text-ink-soft">Administrador</strong> cadastra e altera agentes e a base de conhecimento.{" "}
+          <strong className="font-medium text-ink-soft">Usuário</strong> só visualiza a aba Prompt de cada agente e a base de conhecimento.
+        </p>
       </div>
 
       <Card>

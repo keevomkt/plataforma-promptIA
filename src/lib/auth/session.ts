@@ -50,9 +50,18 @@ export function unauthorized() {
   return NextResponse.json({ error: "Faça login para continuar." }, { status: 401 });
 }
 
-export async function requireAdmin(): Promise<SessionUser> {
+/** Para rotas de API que alteram algo: quem não é administrador só visualiza. */
+export function forbidden() {
+  return NextResponse.json({ error: "Somente administradores podem fazer alterações." }, { status: 403 });
+}
+
+/**
+ * Exige administrador. Quem não é administrador só visualiza os prompts e a
+ * base de conhecimento: é levado para `fallback` (ex.: a aba Prompt do agente).
+ */
+export async function requireAdmin(fallback = "/"): Promise<SessionUser> {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect("/");
+  if (user.role !== "ADMIN") redirect(fallback);
   return user;
 }
 

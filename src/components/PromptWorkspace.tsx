@@ -17,7 +17,7 @@ import { parsePrompt, structureSummary, visibleSections, type LineKind, type Pro
 import { splitSentences } from "@/lib/engine/text";
 import { countWords, estimateTokens, formatCount } from "@/lib/tokens";
 import { UnitPicker } from "@/components/UnitPicker";
-import type { BusinessUnitId } from "@/lib/brand";
+import { BUSINESS_UNITS, type BusinessUnitId } from "@/lib/brand";
 
 const KIND_LABELS: Record<LineKind, string> = {
   heading: "Título de seção",
@@ -42,6 +42,8 @@ export function PromptWorkspace(props: {
   temperature: number;
   topP: number;
   unit: BusinessUnitId | null;
+  /** Quem não é administrador só lê: sem edição, importação nem pedido de alteração. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const editorRef = useRef<ReactCodeMirrorRef>(null);
@@ -213,6 +215,7 @@ export function PromptWorkspace(props: {
             <span>·</span>
             <span>~{formatCount(estimateTokens(content))} tokens</span>
             {dirty && <span className="rounded-sm border border-warn-border bg-warn-bg px-1.5 py-0.5 text-warn">Edição não salva</span>}
+            {props.readOnly && <span className="rounded-sm border border-line bg-sunken px-1.5 py-0.5 text-ink-soft">Somente leitura</span>}
           </div>
           <div className="flex flex-wrap items-center gap-1">
             <Button
@@ -243,24 +246,32 @@ export function PromptWorkspace(props: {
             <Button size="sm" variant="ghost" onClick={copy}>
               Copiar
             </Button>
-            <input ref={fileRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" className="hidden" onChange={onFile} />
-            <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}>
-              Importar
-            </Button>
+            {!props.readOnly && (
+              <>
+                <input ref={fileRef} type="file" accept=".txt,.md,.markdown,text/plain,text/markdown" className="hidden" onChange={onFile} />
+                <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()}>
+                  Importar
+                </Button>
+              </>
+            )}
             <Button size="sm" variant="ghost" onClick={() => exportAs("txt")}>
               Exportar .txt
             </Button>
             <Button size="sm" variant="ghost" onClick={() => exportAs("md")}>
               Exportar .md
             </Button>
-            {dirty && (
-              <Button size="sm" variant="ghost" onClick={() => setContent(props.content)}>
-                Descartar edição
-              </Button>
+            {!props.readOnly && (
+              <>
+                {dirty && (
+                  <Button size="sm" variant="ghost" onClick={() => setContent(props.content)}>
+                    Descartar edição
+                  </Button>
+                )}
+                <Button size="sm" variant="primary" onClick={submitEdit} disabled={!dirty || isSaving}>
+                  {isSaving ? "Validando…" : "Revisar e salvar edição"}
+                </Button>
+              </>
             )}
-            <Button size="sm" variant="primary" onClick={submitEdit} disabled={!dirty || isSaving}>
-              {isSaving ? "Validando…" : "Revisar e salvar edição"}
-            </Button>
           </div>
         </div>
         {message && (
@@ -274,7 +285,15 @@ export function PromptWorkspace(props: {
           </div>
         )}
         <div className="min-h-0 flex-1 overflow-auto">
-          <CodeMirror ref={editorRef} value={content} onChange={setContent} extensions={extensions} basicSetup={false} height="100%" />
+          <CodeMirror
+            ref={editorRef}
+            value={content}
+            onChange={setContent}
+            extensions={extensions}
+            basicSetup={false}
+            height="100%"
+            readOnly={props.readOnly}
+          />
         </div>
       </section>
 
@@ -319,7 +338,7 @@ export function PromptWorkspace(props: {
                     )}
                   </div>
                 )}
-                {changeHref && !dirty && (
+                {changeHref && !dirty && !props.readOnly && (
                   <Link href={changeHref} className="inline-block text-xs font-medium text-accent hover:underline">
                     Pedir alteração nesta regra →
                   </Link>
@@ -329,7 +348,7 @@ export function PromptWorkspace(props: {
           </CardBody>
         </Card>
 
-        <ParamsCard {...props} />
+        {props.readOnly ? <ParamsView {...props} /> : <ParamsCard {...props} />}
 
         <Card>
           <CardHeader className="py-2.5">
@@ -458,6 +477,27 @@ function EyeIcon({ open }: { open: boolean }) {
       <circle cx="10" cy="10" r="2.6" />
       {!open && <path d="M3 17 17 3" strokeLinecap="round" />}
     </svg>
+  );
+}
+
+/** Configuração do agente só para consulta (quem não é administrador). */
+function ParamsView(props: { temperature: number; topP: number; unit: BusinessUnitId | null }) {
+  return (
+    <Card>
+      <CardHeader className="py-2.5">
+        <span className="text-sm font-medium text-ink">Configuração do agente</span>
+      </CardHeader>
+      <CardBody>
+        <dl className="grid grid-cols-2 gap-y-1.5 text-[13px]">
+          <dt className="text-ink-faint">Unidade de negócio</dt>
+          <dd className="text-right text-ink">{props.unit ? `${props.unit} · ${BUSINESS_UNITS[props.unit].brand}` : "—"}</dd>
+          <dt className="text-ink-faint">Temperatura</dt>
+          <dd className="text-right font-mono text-ink">{props.temperature}</dd>
+          <dt className="text-ink-faint">Top P</dt>
+          <dd className="text-right font-mono text-ink">{props.topP}</dd>
+        </dl>
+      </CardBody>
+    </Card>
   );
 }
 

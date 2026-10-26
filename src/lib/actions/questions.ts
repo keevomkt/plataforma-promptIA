@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth/session";
+import { requireAdmin } from "@/lib/auth/session";
 import { classifyQuestion } from "@/lib/engine/locate";
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -14,7 +14,7 @@ const MAX = 500;
  * resposta. A mesma pergunta feita de novo só sobe para o topo.
  */
 export async function askQuestion(promptId: string, input: string): Promise<ActionResult<{ url: string }>> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   const text = input.trim().replace(/\s+/g, " ").slice(0, MAX);
   if (!text) return { ok: false, error: "Escreva a sua pergunta." };
   const prompt = await prisma.prompt.findUnique({ where: { id: promptId }, select: { slug: true } });
@@ -32,7 +32,7 @@ export async function askQuestion(promptId: string, input: string): Promise<Acti
 
 /** Remove uma pergunta do histórico (só o registro; nada no prompt muda). */
 export async function deleteQuestion(id: string): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const q = await prisma.question.findUnique({ where: { id }, select: { prompt: { select: { slug: true } } } });
   if (!q) return { ok: true, data: null };
   await prisma.question.delete({ where: { id } });

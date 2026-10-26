@@ -8,8 +8,14 @@ import { KnowledgeUpload } from "@/components/knowledge/KnowledgeUpload";
 import { MAX_FILE_MB } from "@/lib/knowledge/extract";
 import { KnowledgeFilters } from "@/components/knowledge/KnowledgeFilters";
 import { Card, CardBody, Eyebrow, Pill } from "@/components/ui/Surfaces";
+import { Tabs } from "@/components/ui/Tabs";
 import { UnitLogo } from "@/components/Brand";
-import { resolveUnit } from "@/lib/brand";
+import { BUSINESS_UNITS, resolveUnit, type BusinessUnitId } from "@/lib/brand";
+import { GENERAL_TAB as GENERAL, knowledgeTab as tabOf } from "@/lib/knowledge/tabs";
+import { requireUser } from "@/lib/auth/session";
+
+// Abas na mesma ordem da barra lateral; a primeira abre por padrão
+const UNIT_TABS: BusinessUnitId[] = ["HCM", "EC", "ERP", "3UN"];
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -18,13 +24,18 @@ function formatSize(bytes: number) {
 }
 
 export default async function KnowledgePage({ searchParams }: { searchParams: { q?: string; unidade?: string; categoria?: string } }) {
-  const [docs, units] = await Promise.all([listKnowledgeDocuments(), listBusinessUnits()]);
+  const [user, docs, units] = await Promise.all([requireUser(), listKnowledgeDocuments(), listBusinessUnits()]);
+  // Quem não é administrador só consulta: sem envio de arquivos
+  const canEdit = user.role === "ADMIN";
   const q = searchParams.q?.trim() ?? "";
-  const filtered = docs.filter(
-    (d) => (!searchParams.unidade || d.businessUnit === searchParams.unidade) && (!searchParams.categoria || d.category === searchParams.categoria)
-  );
+  const requested = searchParams.unidade?.toUpperCase();
+  const tab = requested === GENERAL ? GENERAL : resolveUnit(requested)?.id ?? UNIT_TABS[0];
+  const tabLabel = tab === GENERAL ? "Geral" : tab === "HCM" ? "eKeep" : tab;
 
-  // Busca no conteúdo dos documentos, com o mesmo critério usado na análise das alterações
+  const inTab = docs.filter((d) => tabOf(d.businessUnit) === tab);
+  const filtered = inTab.filter((d) => !searchParams.categoria || d.category === searchParams.categoria);
+
+  // Busca no conteúdo, só entre os documentos da aba (mesmo critério usado na análise das alterações)
   let results: ReturnType<KnowledgeIndex["search"]> = [];
   if (q) {
     const ids = new Set(filtered.map((d) => d.id));
@@ -32,8 +43,32 @@ export default async function KnowledgePage({ searchParams }: { searchParams: { 
     results = new KnowledgeIndex(sources).search(Array.from(new Set(stems(q))), 20);
   }
 
+  // Grupos por categoria, na ordem da lista de categorias
+  const order = Object.keys(KNOWLEDGE_CATEGORIES);
   const groups = new Map<string, typeof filtered>();
-  for (const d of filtered) groups.set(d.businessUnit, [...(groups.get(d.businessUnit) ?? []), d]);
+  for (const d of filtered) groups.set(d.category, [...(groups.get(d.category) ?? []), d]);
+  const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+
+  // Abas: as quatro unidades sempre; "Geral" só quando tem documento (ou está aberta)
+  const hasGeneral = docs.some((d) => tabOf(d.businessUnit) === GENERAL);
+  const href = (id: string) => {
+    const params = new URLSearchParams({ unidade: id });
+    if (q) params.set("q", q);
+    if (searchParams.categoria) params.set("categoria", searchParams.categoria);
+    return `/conhecimento?${params.toString()}`;
+  };
+  const tabs = [
+    ...UNIT_TABS.map((id) => ({
+      href: href(id),
+      label: id === "HCM" ? `${BUSINESS_UNITS[id].brand} (${id})` : id,
+      active: tab === id,
+      icon: <UnitLogo unit={id} height={18} />,
+      count: docs.filter((d) => tabOf(d.businessUnit) === id).length,
+    })),
+    ...(hasGeneral || tab === GENERAL
+      ? [{ href: href(GENERAL), label: "Geral", active: tab === GENERAL, count: docs.filter((d) => tabOf(d.businessUnit) === GENERAL).length }]
+      : []),
+  ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
@@ -46,16 +81,18 @@ export default async function KnowledgePage({ searchParams }: { searchParams: { 
         </p>
       </div>
 
-      <KnowledgeUpload units={units} maxMb={MAX_FILE_MB} />
+      <Tabs tabs={tabs} className="border-b border-line" />
 
-      <KnowledgeFilters units={units} />
+      {canEdit && <KnowledgeUpload units={units} maxMb={MAX_FILE_MB} tab={tab} />}
+
+      <KnowledgeFilters unitLabel={tabLabel} />
 
       {q && (
         <section>
           <Eyebrow className="mb-2">
-            Trechos encontrados para &ldquo;{q}&rdquo; ({results.length})
+            Trechos encontrados em {tabLabel} para &ldquo;{q}&rdquo; ({results.length})
           </Eyebrow>
-          {!results.length && <p className="text-sm text-ink-faint">Nenhum trecho relacionado.</p>}
+          {!results.length && <p className="text-sm text-ink-faint">Nenhum trecho relacionado nesta unidade.</p>}
           <div className="space-y-2">
             {results.map((r) => (
               <Link key={r.documentId} href={`/conhecimento/${r.documentId}`} className="block">
@@ -75,32 +112,30 @@ export default async function KnowledgePage({ searchParams }: { searchParams: { 
         </section>
       )}
 
-      {!docs.length ? (
+      {!inTab.length ? (
         <p className="rounded border border-dashed border-line px-4 py-6 text-center text-sm text-ink-faint">
-          Nenhum documento ainda. Envie os arquivos acima (PDF, Word, TXT, Markdown, CSV ou JSON).
+          Nenhum documento nesta unidade ainda.
+          {canEdit && <> Envie os arquivos acima: a unidade {tab === GENERAL ? "é a que você digitar" : `${tabLabel} já vem marcada`}.</>}
         </p>
+      ) : !filtered.length ? (
+        <p className="text-sm text-ink-faint">Nenhum documento de {tabLabel} nessa categoria.</p>
       ) : (
-        <div className="space-y-5">
-          {Array.from(groups.entries()).map(([unit, items]) => (
-            <section key={unit}>
-              <div className="mb-2 flex items-center gap-2">
-                <UnitLogo unit={unit} height={22} />
-                <Eyebrow>
-                  {unit}
-                  {resolveUnit(unit) ? ` · ${resolveUnit(unit)!.brand}` : ""} · {items.length} documento(s)
-                </Eyebrow>
+        <div className="space-y-6">
+          {sortedGroups.map(([category, items]) => (
+            <section key={category}>
+              <div className="mb-2.5 flex items-center gap-2.5">
+                <Pill tone="accent" className="shrink-0 font-semibold">
+                  {KNOWLEDGE_CATEGORIES[category] ?? category}
+                </Pill>
+                <span className="shrink-0 text-[12px] text-ink-faint">{items.length} documento(s)</span>
+                <span className="h-px flex-1 bg-line-strong" />
               </div>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {items.map((d) => (
                   <Link key={d.id} href={`/conhecimento/${d.id}`} className="block">
                     <Card className="h-full hover:border-line-strong">
                       <CardBody className="space-y-1 py-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="text-[13.5px] font-medium text-ink">{d.title}</span>
-                          <Pill tone="accent" className="shrink-0">
-                            {KNOWLEDGE_CATEGORIES[d.category] ?? d.category}
-                          </Pill>
-                        </div>
+                        <span className="block text-[13.5px] font-medium text-ink">{d.title}</span>
                         {d.description && <p className="line-clamp-2 text-[12.5px] text-ink-soft">{d.description}</p>}
                         {d.current && (
                           <p className="text-[11.5px] text-ink-faint">
@@ -115,7 +150,6 @@ export default async function KnowledgePage({ searchParams }: { searchParams: { 
               </div>
             </section>
           ))}
-          {!filtered.length && <p className="text-sm text-ink-faint">Nenhum documento com esses filtros.</p>}
         </div>
       )}
     </div>

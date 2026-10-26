@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion } from "@/lib/data";
-import { requireUser } from "@/lib/auth/session";
+import { requireAdmin } from "@/lib/auth/session";
 import { createPrompt } from "@/lib/actions/prompts";
 
 type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -13,7 +13,7 @@ type ActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
  * parâmetros da versão escolhida, e ela passa a ser a atual.
  */
 export async function restoreVersion(versionId: string): Promise<ActionResult<{ version: number }>> {
-  const user = (await requireUser()).name;
+  const user = (await requireAdmin()).name;
   const source = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
   if (!source) return { ok: false, error: "Versão não encontrada." };
   const current = await getCurrentVersion(source.promptId);
@@ -57,7 +57,7 @@ export async function restoreVersion(versionId: string): Promise<ActionResult<{ 
 
 /** Duplicar cria um prompt independente a partir da versão (para outro agente ou para experimentar). */
 export async function duplicateVersion(versionId: string, name: string): Promise<ActionResult<{ slug: string }>> {
-  await requireUser();
+  await requireAdmin();
   const source = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
   if (!source) return { ok: false, error: "Versão não encontrada." };
   return createPrompt({
@@ -77,7 +77,7 @@ export async function duplicateVersion(versionId: string, name: string): Promise
  * histórico mostrar se a versão vigente já foi levada para a produção.
  */
 export async function recordKeevoCopy(versionId: string): Promise<ActionResult<{ copiedAt: string }>> {
-  const user = (await requireUser()).name;
+  const user = (await requireAdmin()).name;
   const version = await prisma.promptVersion.findUnique({ where: { id: versionId }, include: { prompt: true } });
   if (!version) return { ok: false, error: "Versão não encontrada." };
   const copy = await prisma.versionCopy.create({ data: { versionId, copiedBy: user } });

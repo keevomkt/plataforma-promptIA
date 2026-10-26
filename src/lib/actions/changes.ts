@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentVersion, readAnalysis } from "@/lib/data";
-import { requireUser } from "@/lib/auth/session";
+import { requireAdmin } from "@/lib/auth/session";
 import { loadKnowledgeForPrompt } from "@/lib/knowledge/data";
 import { getAnalyzer } from "@/lib/engine";
 import { applyOperations } from "@/lib/engine/apply";
@@ -52,7 +52,7 @@ export async function requestChange(
   promptId: string,
   request: string
 ): Promise<ActionResult<{ changeId: string }> | { ok: false; error: string; claudeAnswer: true }> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   const text = request.trim();
   if (!text) return { ok: false, error: "Descreva o que você deseja alterar." };
   // Resposta do Claude colada aqui seria lida como pedido escrito e poderia mexer em linhas sem relação
@@ -78,7 +78,7 @@ export async function requestChange(
 
 /** Resposta a uma pergunta de esclarecimento (escopo, detalhe) → refaz a análise. */
 export async function answerClarification(changeId: string, answer: string): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId }, include: { fromVersion: true } });
   if (!change?.fromVersion) return { ok: false, error: "Alteração não encontrada." };
   if (!["AGUARDANDO_ESCLARECIMENTO", "SEM_ALTERACAO"].includes(change.status)) {
@@ -111,7 +111,7 @@ export async function applyChange(
   edits: { id: string; enabled: boolean; newText: string }[],
   decisions: { line: number; choice: "alterar" | "manter"; text: string }[] = []
 ): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const parsedEdits = EditSchema.safeParse(edits);
   const parsedDecisions = DecisionSchema.safeParse(decisions);
   if (!parsedEdits.success || !parsedDecisions.success) return { ok: false, error: "Operações inválidas." };
@@ -189,7 +189,7 @@ export async function applyChange(
 
 /** Volta uma alteração aplicada (ainda não salva) para edição das operações. */
 export async function reopenChange(changeId: string): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change || change.status !== "APLICADA" || !["PEDIDO", "DIAGNOSTICO", "CLAUDE"].includes(change.kind)) {
     return { ok: false, error: "Só é possível editar alterações aplicadas e ainda não salvas." };
@@ -204,7 +204,7 @@ export async function reopenChange(changeId: string): Promise<ActionResult<null>
 
 /** PASSO 9: salva o novo prompt completo como uma nova versão. */
 export async function saveAsVersion(changeId: string, description: string): Promise<ActionResult<{ versionId: string }>> {
-  const user = (await requireUser()).name;
+  const user = (await requireAdmin()).name;
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId }, include: { fromVersion: true } });
   if (!change?.fromVersion || change.proposedContent === null) return { ok: false, error: "Alteração não encontrada." };
   if (change.status !== "APLICADA") return { ok: false, error: "Esta alteração não está pronta para ser salva." };
@@ -243,7 +243,7 @@ export async function saveAsVersion(changeId: string, description: string): Prom
 }
 
 export async function cancelChange(changeId: string): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change) return { ok: false, error: "Alteração não encontrada." };
   if (change.status === "VERSIONADA") return { ok: false, error: "Alterações já versionadas não podem ser canceladas. Restaure uma versão anterior." };
@@ -261,7 +261,7 @@ export async function cancelChange(changeId: string): Promise<ActionResult<null>
 const DELETABLE_STATUSES = ["CANCELADA", "SEM_ALTERACAO", "REVISAO_CONCLUIDA", "RESPONDIDA"];
 
 export async function deleteChange(changeId: string): Promise<ActionResult<null>> {
-  await requireUser();
+  await requireAdmin();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change) return { ok: false, error: "Alteração não encontrada." };
   if (!DELETABLE_STATUSES.includes(change.status)) {
@@ -274,7 +274,7 @@ export async function deleteChange(changeId: string): Promise<ActionResult<null>
 
 /** Limpa de uma vez todos os pedidos cancelados/sem alteração de um prompt. */
 export async function clearDeadChanges(promptId: string): Promise<ActionResult<{ count: number }>> {
-  await requireUser();
+  await requireAdmin();
   const { count } = await prisma.changeRequest.deleteMany({
     where: { promptId, status: { in: DELETABLE_STATUSES } },
   });
@@ -284,7 +284,7 @@ export async function clearDeadChanges(promptId: string): Promise<ActionResult<{
 
 /** Refaz a análise do mesmo pedido sobre a versão atual (quando o prompt mudou). */
 export async function reanalyzeChange(changeId: string): Promise<ActionResult<{ changeId: string }>> {
-  const me = await requireUser();
+  const me = await requireAdmin();
   const change = await prisma.changeRequest.findUnique({ where: { id: changeId } });
   if (!change || change.kind !== "PEDIDO") return { ok: false, error: "Alteração não encontrada." };
   const current = await getCurrentVersion(change.promptId);
